@@ -1,0 +1,17 @@
+BasedOnStyle: LLVM
+---
+Language: Cpp
+
+AlwaysBreakTemplateDeclarations: Yes
+
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<tt/'
+    Priority: 2
+  - Regex: '^<[^./]*[./]'
+    Priority: 3
+  - Regex: '^<[^./]*>$'
+    Priority: 4
+
+IncludeBlocks: Regroup
