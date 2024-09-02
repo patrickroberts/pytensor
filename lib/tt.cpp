@@ -11,9 +11,7 @@
 #include <boost/mp11.hpp>
 #include <magic_enum.hpp>
 #include <magic_enum_switch.hpp>
-#include <pybind11/cast.h>
 #include <pybind11/pybind11.h>
-#include <pybind11/pytypes.h>
 #include <pybind11/stl.h>
 
 #include <format>
@@ -49,16 +47,20 @@ PYBIND11_MODULE(tt, m) {
   namespace py = pybind11;
   namespace mp = boost::mp11;
 
-  py::enum_<tt::DType> dtype(m, "dtype");
-  py::enum_<tt::Layout> layout(m, "layout");
+  constexpr auto bind_enum = []<class T>(std::in_place_type_t<T>,
+                                         const py::handle &handle,
+                                         const char *name) {
+    using enum_type = T;
 
-  for (const auto &[value, name] : magic_enum::enum_entries<tt::DType>()) {
-    dtype.value(name.data(), value);
-  }
+    py::enum_<enum_type> type(handle, name);
 
-  for (const auto &[value, name] : magic_enum::enum_entries<tt::Layout>()) {
-    layout.value(name.data(), value);
-  }
+    for (const auto &[value, name] : magic_enum::enum_entries<enum_type>()) {
+      type.value(name.data(), value);
+    }
+  };
+
+  bind_enum(std::in_place_type<tt::DType>, m, "dtype");
+  bind_enum(std::in_place_type<tt::Layout>, m, "layout");
 
   using element_types =
       mp::mp_list<tt::Float32, tt::Float64, tt::BFloat16, tt::UInt8, tt::Int8,
@@ -66,29 +68,33 @@ PYBIND11_MODULE(tt, m) {
   using extents_types = mp::mp_list<tt::dims<0>, tt::dims<1>, tt::dims<2>,
                                     tt::dims<3>, tt::dims<4>, tt::dims<5>,
                                     tt::dims<6>, tt::dims<7>, tt::dims<8>>;
-  using layout_types = mp::mp_list<tt::RowMajor, tt::Tiled>;
+  using row_major_tensor_types =
+      mp::mp_product<tt::Tensor, element_types, extents_types,
+                     mp::mp_list<tt::RowMajor>>;
+  using tiled_tensor_types = mp::mp_product<
+      tt::Tensor, element_types,
+      mp::mp_list<tt::dims<2>, tt::dims<3>, tt::dims<4>, tt::dims<5>,
+                  tt::dims<6>, tt::dims<7>, tt::dims<8>>,
+      mp::mp_list<tt::Tiled>>;
+  using tensor_types =
+      mp::mp_transform<mp::mp_identity, mp::mp_append<row_major_tensor_types,
+                                                      tiled_tensor_types>>;
 
   auto m_tensor = m.def_submodule("Tensor");
 
-  mp::mp_for_each<
-      mp::mp_product<mp::mp_list, element_types, extents_types, layout_types>>(
-      [&]<class TElement, class TExtents, class TLayout>(
-          mp::mp_list<TElement, TExtents, TLayout>) {
-        if constexpr (TExtents::rank() >= 2 or
-                      not std::is_same_v<TLayout, tt::Tiled>) {
-          using tensor_type = tt::Tensor<TElement, TExtents, TLayout>;
+  mp::mp_for_each<tensor_types>([&]<class T>(mp::mp_identity<T>) {
+    using tensor_type = T;
+    using layout_type = tt::layout_type_t<tensor_type>;
+    using element_type = tt::element_type_t<tensor_type>;
+    using extents_type = tt::extents_type_t<tensor_type>;
 
-          py::class_<tensor_type> c_tensor{
-              m_tensor.def_submodule(name_of(TLayout{}))
-                  .def_submodule(name_of(TElement{})),
-              name_of(TExtents{}),
-          };
+    auto m_layout = m_tensor.def_submodule(name_of(layout_type{}));
+    auto m_element = m_layout.def_submodule(name_of(element_type{}));
+    auto c_tensor = py::class_<tensor_type>{m_element, name_of(extents_type{})};
 
-          c_tensor.def("__repr__", [](const tensor_type &tensor) {
-            return std::format("{}", tensor);
-          });
-        }
-      });
+    c_tensor.def("__repr__",
+                 [](const T &tensor) { return std::format("{}", tensor); });
+  });
 
   const auto default_dtype = std::make_shared<tt::DType>(tt::DType::Float32);
 
@@ -96,15 +102,21 @@ PYBIND11_MODULE(tt, m) {
 
   m.def("get_default_dtype", [=] { return *default_dtype; });
 
-  constexpr auto arange = [](tt::arithmetic auto start, tt::arithmetic auto end,
-                             tt::Float64 step, tt::DType dtype) {
+  constexpr auto with_element = [](tt::DType dtype, auto callback) {
     return magic_enum::enum_switch(
-        [=](auto dtype) {
+        [&](auto dtype) {
           constexpr auto index = static_cast<std::size_t>(dtype());
-          using TElement = mp::mp_at_c<element_types, index>;
-          return py::cast(tt::arange<TElement>(start, end, step));
+          using element_type = mp::mp_at_c<element_types, index>;
+          return callback(element_type{});
         },
         dtype);
+  };
+
+  constexpr auto arange = [=](auto start, auto end, tt::Float64 step,
+                              tt::DType dtype) {
+    return with_element(dtype, [=]<class TElement>(TElement) {
+      return py::cast(tt::arange<TElement>(start, end, step));
+    });
   };
 
   m.def(
@@ -136,43 +148,43 @@ PYBIND11_MODULE(tt, m) {
       },
       py::arg("end"), py::kw_only(), py::arg("dtype") = py::none());
 
+  constexpr auto with_extents = [=](const py::args &args, auto callback) {
+    return mp::mp_with_index<mp::mp_size<element_types>::value>(
+        args.size(), [&](auto rank) {
+          return [&]<auto... Is>(std::index_sequence<Is...>) {
+            return callback(py::cast<std::size_t>(args[Is])...);
+          }(std::make_index_sequence<rank>{});
+        });
+  };
+
+  constexpr auto with_element_and_extents =
+      [=](tt::DType dtype, const py::args &args, auto callback) {
+        return with_element(dtype, [&](auto element) {
+          return with_extents(args, [&](auto... extents) {
+            return callback(element, extents...);
+          });
+        });
+      };
+
   m.def(
       "ones",
       [=](const py::args &args, std::optional<tt::DType> dtype) {
-        return magic_enum::enum_switch(
-            [&](auto dtype) {
-              constexpr auto index = static_cast<std::size_t>(dtype());
-              using TElement = mp::mp_at_c<element_types, index>;
-
-              return mp::mp_with_index<mp::mp_size<extents_types>::value>(
-                  args.size(), [&](auto rank) {
-                    return [&]<auto... Is>(std::index_sequence<Is...>) {
-                      return py::cast(tt::ones<TElement>(
-                          py::cast<std::size_t>(args[Is])...));
-                    }(std::make_index_sequence<rank>{});
-                  });
-            },
-            dtype ? *dtype : *default_dtype);
+        return with_element_and_extents(
+            dtype ? *dtype : *default_dtype, args,
+            []<class TElement>(TElement, auto... extents) {
+              return py::cast(tt::ones<TElement>(extents...));
+            });
       },
       py::kw_only(), py::arg("dtype") = py::none());
 
   m.def(
       "zeros",
       [=](const py::args &args, std::optional<tt::DType> dtype) {
-        return magic_enum::enum_switch(
-            [&](auto dtype) {
-              constexpr auto index = static_cast<std::size_t>(dtype());
-              using TElement = mp::mp_at_c<element_types, index>;
-
-              return mp::mp_with_index<mp::mp_size<extents_types>::value>(
-                  args.size(), [&](auto rank) {
-                    return [&]<auto... Is>(std::index_sequence<Is...>) {
-                      return py::cast(tt::zeros<TElement>(
-                          py::cast<std::size_t>(args[Is])...));
-                    }(std::make_index_sequence<rank>{});
-                  });
-            },
-            dtype ? *dtype : *default_dtype);
+        return with_element_and_extents(
+            dtype ? *dtype : *default_dtype, args,
+            []<class TElement>(TElement, auto... extents) {
+              return py::cast(tt::zeros<TElement>(extents...));
+            });
       },
       py::kw_only(), py::arg("dtype") = py::none());
 }
