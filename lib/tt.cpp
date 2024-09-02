@@ -9,7 +9,6 @@
 
 #include <boost/mp11.hpp>
 #include <magic_enum.hpp>
-#include <magic_enum_switch.hpp>
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
 
@@ -106,13 +105,14 @@ PYBIND11_MODULE(tt, m) {
   m.def("get_default_dtype", [=] { return *default_dtype; });
 
   constexpr auto with_element = [](tt::DType dtype, auto callback) {
-    return magic_enum::enum_switch(
-        [&](tt::integral_constant_like auto dtype) {
-          constexpr auto index = *magic_enum::enum_index(dtype());
+    constexpr auto dtype_count = magic_enum::enum_count<tt::DType>();
+
+    return mp::mp_with_index<dtype_count>(
+        *magic_enum::enum_index(dtype),
+        [&](tt::integral_constant_like auto index) {
           using element_type = mp::mp_at_c<element_types, index>;
           return callback(element_type{});
-        },
-        dtype);
+        });
   };
 
   constexpr auto arange = [=](auto start, auto end, tt::Float64 step,
@@ -122,15 +122,21 @@ PYBIND11_MODULE(tt, m) {
     });
   };
 
+  constexpr tt::Int64 default_start = 0;
+  constexpr tt::Int64 default_step = 1;
+
   m.def(
       "arange",
-      [=](tt::Int64 end, tt::DType dtype) { return arange(0, end, 1, dtype); },
+      [=](tt::Int64 end, tt::DType dtype) {
+        return arange(default_start, end, default_step, dtype);
+      },
       py::arg("end"), py::kw_only(), py::arg("dtype") = tt::DType::Int64);
 
   m.def(
       "arange",
       [=](tt::Float64 end, std::optional<tt::DType> dtype) {
-        return arange(0, end, 1, value_or_default(dtype));
+        return arange(default_start, end, default_step,
+                      value_or_default(dtype));
       },
       py::arg("end"), py::kw_only(), py::arg("dtype") = py::none());
 
@@ -152,9 +158,9 @@ PYBIND11_MODULE(tt, m) {
       py::arg("dtype") = py::none());
 
   constexpr auto with_extents = [](const py::args &args, auto callback) {
-    constexpr mp::mp_size<element_types> size{};
+    constexpr mp::mp_size<extents_types> extents_types_count{};
 
-    return mp::mp_with_index<size>(
+    return mp::mp_with_index<extents_types_count>(
         args.size(), [&](tt::integral_constant_like auto rank) {
           return [&]<auto... Is>(std::index_sequence<Is...>) {
             return callback(py::cast<std::size_t>(args[Is])...);
@@ -165,17 +171,17 @@ PYBIND11_MODULE(tt, m) {
   constexpr auto with_element_and_extents =
       [=](tt::DType dtype, const py::args &args, auto callback) {
         return with_element(dtype, [&](tt::arithmetic auto element) {
-          return with_extents(args, [&](tt::index auto... extents) {
+          return with_extents(args, [&](auto... extents) {
             return callback(element, extents...);
           });
         });
       };
 
-  const auto with_fill = [=](tt::arithmetic auto fill_value) {
+  const auto with_fill = [=](auto fill_value) {
     return [=](const py::args &args, std::optional<tt::DType> dtype) {
       return with_element_and_extents(
           value_or_default(dtype), args,
-          [&]<tt::arithmetic TElement>(TElement, tt::index auto... extents) {
+          [&]<tt::arithmetic TElement>(TElement, auto... extents) {
             return py::cast(
                 tt::full(static_cast<TElement>(fill_value), extents...));
           });
