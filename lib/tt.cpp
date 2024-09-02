@@ -105,9 +105,11 @@ PYBIND11_MODULE(tt, m) {
   m.def("get_default_dtype", [=] { return *default_dtype; });
 
   constexpr auto with_element = [](tt::DType dtype, auto callback) {
-    constexpr auto dtype_count = magic_enum::enum_count<tt::DType>();
+    constexpr mp::mp_size<element_types> element_types_count{};
 
-    return mp::mp_with_index<dtype_count>(
+    static_assert(element_types_count == magic_enum::enum_count<tt::DType>());
+
+    return mp::mp_with_index<element_types_count>(
         *magic_enum::enum_index(dtype),
         [&](tt::integral_constant_like auto index) {
           using element_type = mp::mp_at_c<element_types, index>;
