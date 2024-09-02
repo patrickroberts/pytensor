@@ -1,13 +1,19 @@
 #pragma once
 
-#include <tt/core/concepts.hpp>
+#include <cstddef>
 
 namespace tt::inline core {
 
-template <tt::arithmetic T>
-struct dtype_t {};
-
-template <tt::arithmetic T>
-inline constexpr dtype_t<T> dtype{};
+enum class DType : std::size_t {
+  Float32,
+  Float64,
+  BFloat16,
+  Uint8,
+  Int8,
+  Int16,
+  Int32,
+  Int64,
+  Bool,
+};
 
 } // namespace tt::inline core

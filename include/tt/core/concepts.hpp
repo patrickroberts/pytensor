@@ -21,7 +21,7 @@ inline constexpr std::size_t common_extent_v =
     N1 == N2 ? N1 : std::dynamic_extent;
 
 template <class T>
-concept extents = tt::is_instantiation_of_typename_values<T, std::extents>();
+concept extents = tt::is_extents_v<T>;
 
 template <class T, std::size_t Rank>
 concept has_rank = T::rank() == Rank;
@@ -33,11 +33,8 @@ template <class M, class L>
 concept mapping = std::same_as<tt::layout_type_t<M>, L> and
                   tt::extents<tt::extents_type_t<M>>;
 
-template <class L, class E>
-concept layout = tt::mapping<typename L::template mapping<E>, L>;
-
 template <class T>
-concept tensor = tt::is_instantiation_of_typenames<T, std::mdspan>();
+concept tensor = tt::is_tensor_v<T>;
 
 template <class T>
 concept matrix = tt::tensor<T> and tt::has_rank<T, 2>;

@@ -17,9 +17,21 @@ public:
     return element_formatter.parse(ctx);
   }
 
-  constexpr std::format_context::iterator
-  format(const TInput input, std::format_context &ctx) const {
-    auto out = std::format_to(ctx.out(), "[");
+  constexpr std::format_context::iterator format(const TInput &input,
+                                                 std::format_context &ctx) const
+    requires(TInput::rank() == 0)
+  {
+    auto out = std::format_to(ctx.out(), "tensor(");
+    out = element_formatter.format(+input(), ctx);
+    return std::format_to(out, ")");
+  }
+
+  constexpr std::format_context::iterator format(const TInput &input,
+                                                 std::format_context &ctx) const
+    requires(TInput::rank() > 0)
+  {
+    constexpr std::string_view prefix = "tensor([";
+    auto out = std::format_to(ctx.out(), prefix);
 
     const auto recur = [&, &element_formatter = element_formatter](
                            const auto &recur, const auto... indices) {
@@ -28,14 +40,14 @@ public:
       for (std::size_t index = 0; index < input.extent(rank); ++index) {
         if constexpr (rank + 1 == TInput::rank()) {
           if (index > 0) {
-            out = std::format_to(out, ",");
+            out = std::format_to(out, ", ");
           }
 
           out = element_formatter.format(+input(indices..., index), ctx);
         } else {
           if (index > 0) {
-            // indentation
-            out = std::format_to(out, ",\n{:<{}}", "", rank + 1);
+            constexpr auto indentation = prefix.size() + rank;
+            out = std::format_to(out, ",\n{:<{}}", "", indentation);
           }
 
           out = std::format_to(out, "[");
@@ -47,6 +59,6 @@ public:
 
     recur(recur);
 
-    return std::format_to(out, "]");
+    return std::format_to(out, "])");
   }
 };

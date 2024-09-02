@@ -1,34 +1,34 @@
 #pragma once
 
 #include <tt/core/concepts.hpp>
+#include <tt/core/layout.hpp>
 #include <tt/core/shared_accessor.hpp>
-#include <tt/core/tiled_layout.hpp>
 
 namespace tt::inline core {
 
-template <tt::arithmetic T, tt::extents TExtents, tt::layout<TExtents> TLayout>
-using shared_tensor = std::mdspan<T, TExtents, TLayout, tt::shared_accessor<T>>;
+template <tt::arithmetic T, tt::extents TExtents, class TLayout>
+using Tensor = std::mdspan<T, TExtents, TLayout, tt::shared_accessor<T>>;
 
 template <tt::arithmetic T, tt::extents TExtents>
-using row_major_tensor = tt::shared_tensor<T, TExtents, tt::row_major_layout>;
+using RowMajorTensor = tt::Tensor<T, TExtents, tt::RowMajor>;
 
 template <tt::arithmetic T,
           tt::has_rank<1> TExtents = std::dextents<std::size_t, 1>>
-using row_major_vector = tt::row_major_tensor<T, TExtents>;
+using RowMajorVector = tt::RowMajorTensor<T, TExtents>;
 
 template <tt::arithmetic T,
           tt::has_rank<2> TExtents = std::dextents<std::size_t, 2>>
-using row_major_matrix = tt::row_major_tensor<T, TExtents>;
+using RowMajorMatrix = tt::RowMajorTensor<T, TExtents>;
 
 template <tt::arithmetic T, tt::extents TExtents>
-using tiled_tensor = tt::shared_tensor<T, TExtents, tt::tiled_layout>;
+using TiledTensor = tt::Tensor<T, TExtents, tt::Tiled>;
 
 template <tt::arithmetic T,
           tt::has_rank<1> TExtents = std::dextents<std::size_t, 1>>
-using tiled_vector = tt::tiled_tensor<T, TExtents>;
+using TiledVector = tt::TiledTensor<T, TExtents>;
 
 template <tt::arithmetic T,
           tt::has_rank<2> TExtents = std::dextents<std::size_t, 2>>
-using tiled_matrix = tt::tiled_tensor<T, TExtents>;
+using TiledMatrix = tt::TiledTensor<T, TExtents>;
 
 } // namespace tt::inline core

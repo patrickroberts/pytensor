@@ -11,26 +11,18 @@ using std::experimental::dims;
 template <class T>
 inline constexpr bool is_arithmetic_v = std::is_arithmetic_v<T>;
 
-template <class T, template <class...> class F>
-constexpr bool is_instantiation_of_typenames() {
-  constexpr auto deduce = []<class... Ts>(F<Ts...> *) {};
-  return requires { deduce(static_cast<T *>(nullptr)); };
-}
+template <class T>
+inline constexpr bool is_extents_v = false;
 
-template <class T, template <class, auto...> class F>
-constexpr bool is_instantiation_of_typename_values() {
-  constexpr auto deduce = []<class U, auto... Vs>(F<U, Vs...> *) {};
-  return requires { deduce(static_cast<T *>(nullptr)); };
-}
+template <class TIndex, auto... Extents>
+inline constexpr bool is_extents_v<std::extents<TIndex, Extents...>> = true;
 
-template <class T, template <class, auto...> class F>
-constexpr auto instantiation_for_typename_values() {
-  constexpr auto deduce =
-      []<class U, auto... Vs>(
-          F<U, Vs...> *) -> std::type_identity<F<U, Vs...>> { return {}; };
+template <class T>
+inline constexpr bool is_tensor_v = false;
 
-  return deduce(static_cast<T *>(nullptr));
-}
+template <class TElement, class TExtents, class TLayout, class TAccessor>
+inline constexpr bool
+    is_tensor_v<std::mdspan<TElement, TExtents, TLayout, TAccessor>> = true;
 
 template <class T>
 using element_type_t = T::element_type;

@@ -163,8 +163,14 @@ public:
   };
 };
 
-using row_major_layout = std::layout_right;
-using strided_layout = std::layout_stride;
-using tiled_layout = tt::layout_right_tiled<>;
+using RowMajor = std::layout_right;
+using Strided = std::layout_stride;
+using Tiled = tt::layout_right_tiled<>;
+
+enum class Layout {
+  RowMajor,
+  Strided,
+  Tiled,
+};
 
 } // namespace tt::inline core

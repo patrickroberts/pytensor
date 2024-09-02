@@ -1,12 +1,12 @@
 #pragma once
 
-#include <tt/core/shared_tensor.hpp>
+#include <tt/core/tensor.hpp>
 
 namespace tt::inline operators {
 
 struct full_fn {
   template <tt::arithmetic T, class... TIndices>
-  constexpr tt::row_major_tensor<T, tt::extents_from<TIndices...>>
+  constexpr tt::RowMajorTensor<T, tt::extents_from<TIndices...>>
   operator()(T fill_value, TIndices... extents) const {
     const std::size_t size = (1 * ... * extents);
     auto data_handle = std::make_shared<T[]>(size, fill_value);

@@ -1,4 +1,4 @@
-#include <tt/core/bfloat16.hpp>
+#include <tt/core/float.hpp>
 #include <tt/core/format.hpp>
 #include <tt/operators/arange.hpp>
 #include <tt/operators/reshape.hpp>
@@ -10,7 +10,7 @@
 int main() {
   // create a 3x5x7 tiled tensor of bfloat16...
   const auto tiled_3d =
-      tt::arange<tt::bfloat16>(1, 106) | tt::reshape(3, 5, 7) | tt::to_tiled();
+      tt::arange<tt::BFloat16>(1, 106) | tt::reshape(3, 5, 7) | tt::to_tiled();
   // ...where tile size is 4x4
   static_assert(tt::default_tile_extent == 4);
 
@@ -20,7 +20,7 @@ int main() {
   // create a 3x2x2x4x4 view of the tiled tensor
   const auto tiled_5d = tiled_3d | tt::reshape(3, 2, 2, 4, 4);
 
-  std::format_to(std::ostreambuf_iterator<char>(std::cout),
+  std::format_to(std::ostreambuf_iterator{std::cout},
                  "3x5x7:\n{:>3}\n"
                  "3x8x8:\n{:>3}\n"
                  "3x2x2x4x4:\n{:>3}\n",

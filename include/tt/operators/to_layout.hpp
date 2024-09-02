@@ -1,15 +1,15 @@
 #pragma once
 
-#include <tt/core/shared_tensor.hpp>
-#include <tt/core/tiled_layout.hpp>
+#include <tt/core/layout.hpp>
+#include <tt/core/tensor.hpp>
 
 namespace tt::inline operators {
 
 template <class TLayout>
 struct to_layout_view {
   template <tt::tensor TInput>
-  friend constexpr tt::shared_tensor<tt::element_type_t<TInput>,
-                                     tt::extents_type_t<TInput>, TLayout>
+  friend constexpr tt::Tensor<tt::element_type_t<TInput>,
+                              tt::extents_type_t<TInput>, TLayout>
   operator|(const TInput &input, to_layout_view to_layout) {
     using output_type = decltype(input | to_layout);
     using element_type = tt::element_type_t<output_type>;
@@ -48,8 +48,8 @@ struct to_layout_fn {
   constexpr tt::to_layout_view<TLayout> operator()() const { return {}; }
 
   template <tt::tensor TInput>
-  constexpr tt::shared_tensor<tt::element_type_t<TInput>,
-                              tt::extents_type_t<TInput>, TLayout>
+  constexpr tt::Tensor<tt::element_type_t<TInput>, tt::extents_type_t<TInput>,
+                       TLayout>
   operator()(const TInput &input) const {
     return input | to_layout_fn{}();
   }
@@ -58,8 +58,8 @@ struct to_layout_fn {
 template <class TLayout>
 inline constexpr tt::to_layout_fn<TLayout> to_layout{};
 
-inline constexpr tt::to_layout_fn<tt::tiled_layout> to_tiled{};
+inline constexpr tt::to_layout_fn<tt::Tiled> to_tiled{};
 
-inline constexpr tt::to_layout_fn<tt::row_major_layout> to_row_major{};
+inline constexpr tt::to_layout_fn<tt::RowMajor> to_row_major{};
 
 } // namespace tt::inline operators

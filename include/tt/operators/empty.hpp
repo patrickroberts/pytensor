@@ -1,18 +1,18 @@
 #pragma once
 
-#include <tt/core/shared_tensor.hpp>
-#include <tt/core/tiled_layout.hpp>
+#include <tt/core/layout.hpp>
+#include <tt/core/tensor.hpp>
 
 namespace tt::inline operators {
 
 template <tt::arithmetic T>
 struct empty_fn {
   template <class... TIndices>
-  constexpr tt::row_major_tensor<T, tt::extents_from<TIndices...>>
+  constexpr tt::RowMajorTensor<T, tt::extents_from<TIndices...>>
   operator()(TIndices... extents) const {
     using extents_type = tt::extents_from<TIndices...>;
 
-    const tt::row_major_layout::template mapping<extents_type> mapping{
+    const tt::RowMajor::template mapping<extents_type> mapping{
         extents_type{extents...}};
     auto data_handle =
         std::make_shared_for_overwrite<T[]>(mapping.required_span_size());

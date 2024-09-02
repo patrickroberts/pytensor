@@ -1,37 +1,46 @@
-#include <tt/core/bfloat16.hpp>
 #include <tt/core/dtype.hpp>
+#include <tt/core/float.hpp>
 #include <tt/core/format.hpp>
-#include <tt/core/shared_tensor.hpp>
-#include <tt/core/tiled_layout.hpp>
+#include <tt/core/int.hpp>
+#include <tt/core/layout.hpp>
+#include <tt/core/tensor.hpp>
 #include <tt/operators/arange.hpp>
-#include <tt/operators/full.hpp>
 #include <tt/operators/ones.hpp>
 #include <tt/operators/zeros.hpp>
 
 #include <boost/mp11.hpp>
+#include <magic_enum.hpp>
+#include <magic_enum_switch.hpp>
+#include <pybind11/cast.h>
 #include <pybind11/pybind11.h>
+#include <pybind11/pytypes.h>
+#include <pybind11/stl.h>
 
-#include <cstdint>
 #include <format>
-#include <iostream>
+#include <memory>
 
-constexpr auto name_of(tt::row_major_layout) { return "row_major"; }
-constexpr auto name_of(tt::strided_layout) { return "strided"; }
-constexpr auto name_of(tt::tiled_layout) { return "tiled"; }
+constexpr auto name_of(tt::Float32) { return "Float32"; }
+constexpr auto name_of(tt::Float64) { return "Float64"; }
+constexpr auto name_of(tt::BFloat16) { return "BFloat16"; }
+constexpr auto name_of(tt::UInt8) { return "UInt8"; }
+constexpr auto name_of(tt::Int8) { return "Int8"; }
+constexpr auto name_of(tt::Int16) { return "Int16"; }
+constexpr auto name_of(tt::Int32) { return "Int32"; }
+constexpr auto name_of(tt::Int64) { return "Int64"; }
+constexpr auto name_of(tt::Bool) { return "Bool"; }
 
-constexpr auto name_of(tt::dtype_t<tt::float32>) { return "float32"; }
-constexpr auto name_of(tt::dtype_t<tt::float64>) { return "float64"; }
-constexpr auto name_of(tt::dtype_t<tt::bfloat16>) { return "bfloat16"; }
-constexpr auto name_of(tt::dtype_t<std::uint8_t>) { return "uint8"; }
-constexpr auto name_of(tt::dtype_t<std::int8_t>) { return "int8"; }
-constexpr auto name_of(tt::dtype_t<std::int16_t>) { return "int16"; }
-constexpr auto name_of(tt::dtype_t<std::int32_t>) { return "int32"; }
-constexpr auto name_of(tt::dtype_t<std::int64_t>) { return "int64"; }
-constexpr auto name_of(tt::dtype_t<bool>) { return "bool"; }
+constexpr auto name_of(tt::dims<0>) { return "Scalar"; }
+constexpr auto name_of(tt::dims<1>) { return "Vector"; }
+constexpr auto name_of(tt::dims<2>) { return "Matrix"; }
+constexpr auto name_of(tt::dims<3>) { return "Tensor3D"; }
+constexpr auto name_of(tt::dims<4>) { return "Tensor4D"; }
+constexpr auto name_of(tt::dims<5>) { return "Tensor5D"; }
+constexpr auto name_of(tt::dims<6>) { return "Tensor6D"; }
+constexpr auto name_of(tt::dims<7>) { return "Tensor7D"; }
+constexpr auto name_of(tt::dims<8>) { return "Tensor8D"; }
 
-template <class TElement, class TExtents, class TLayout>
-inline constexpr bool is_tensor_traits_valid_v =
-    TExtents::rank() >= 2 or not std::is_same_v<TLayout, tt::tiled_layout>;
+constexpr auto name_of(tt::RowMajor) { return "RowMajor"; }
+constexpr auto name_of(tt::Tiled) { return "Tiled"; }
 
 template <std::size_t, class T>
 using dependent = T;
@@ -40,120 +49,130 @@ PYBIND11_MODULE(tt, m) {
   namespace py = pybind11;
   namespace mp = boost::mp11;
 
+  py::enum_<tt::DType> dtype(m, "dtype");
+  py::enum_<tt::Layout> layout(m, "layout");
+
+  for (const auto &[value, name] : magic_enum::enum_entries<tt::DType>()) {
+    dtype.value(name.data(), value);
+  }
+
+  for (const auto &[value, name] : magic_enum::enum_entries<tt::Layout>()) {
+    layout.value(name.data(), value);
+  }
+
   using element_types =
-      mp::mp_list<tt::float32, tt::float64, tt::bfloat16, std::uint8_t,
-                  std::int8_t, std::int16_t, std::int32_t, std::int64_t, bool>;
-  using extents_types =
-      mp::mp_list<tt::dims<1>, tt::dims<2>, tt::dims<3>, tt::dims<4>,
-                  tt::dims<5>, tt::dims<6>, tt::dims<7>, tt::dims<8>>;
-  using layout_types =
-      mp::mp_list<tt::row_major_layout, tt::strided_layout, tt::tiled_layout>;
-  using tensor_traits =
-      mp::mp_product<mp::mp_list, element_types, extents_types, layout_types>;
+      mp::mp_list<tt::Float32, tt::Float64, tt::BFloat16, tt::UInt8, tt::Int8,
+                  tt::Int16, tt::Int32, tt::Int64, tt::Bool>;
+  using extents_types = mp::mp_list<tt::dims<0>, tt::dims<1>, tt::dims<2>,
+                                    tt::dims<3>, tt::dims<4>, tt::dims<5>,
+                                    tt::dims<6>, tt::dims<7>, tt::dims<8>>;
+  using layout_types = mp::mp_list<tt::RowMajor, tt::Tiled>;
 
-  const auto m_dtype = m.def_submodule("dtype");
-  const auto m_tensors = m.def_submodule("tensors");
+  auto m_tensor = m.def_submodule("Tensor");
 
-  mp::mp_for_each<element_types>([&]<class TElement>(TElement) {
-    py::class_<tt::dtype_t<TElement>> type(m_dtype,
-                                           name_of(tt::dtype<TElement>));
-  });
-
-  const auto register_tensor_for =
+  mp::mp_for_each<
+      mp::mp_product<mp::mp_list, element_types, extents_types, layout_types>>(
       [&]<class TElement, class TExtents, class TLayout>(
           mp::mp_list<TElement, TExtents, TLayout>) {
-        using tensor_type = tt::shared_tensor<TElement, TExtents, TLayout>;
+        if constexpr (TExtents::rank() >= 2 or
+                      not std::is_same_v<TLayout, tt::Tiled>) {
+          using tensor_type = tt::Tensor<TElement, TExtents, TLayout>;
 
-        constexpr auto element_name = name_of(tt::dtype<TElement>);
-        constexpr auto rank = TExtents::rank();
-        constexpr auto layout_name = name_of(TLayout{});
+          py::class_<tensor_type> c_tensor{
+              m_tensor.def_submodule(name_of(TLayout{}))
+                  .def_submodule(name_of(TElement{})),
+              name_of(TExtents{}),
+          };
 
-        py::class_<tensor_type> tensor_class{
-            m_tensors,
-            std::format("{}_{}d_{}_tensor", element_name, rank, layout_name)
-                .c_str()};
-
-        [&]<auto... Is>(std::index_sequence<Is...>) {
-          const std::array<py::arg, rank> args{
-              py::arg(std::format("d{}", Is).c_str())...};
-
-          tensor_class.def(
-              "__getitem__", [=](const tensor_type &self, py::tuple key) {
-                if (key.size() != rank) {
-                  throw py::index_error("Invalid index");
-                }
-
-                return self(key[Is].template cast<std::size_t>()...);
-              });
-
-          tensor_class.def("__setitem__", [=](tensor_type &self, py::tuple key,
-                                              TElement value) {
-            if (key.size() != rank) {
-              throw py::index_error("Invalid index");
-            }
-
-            return self(key[Is].template cast<std::size_t>()...) = value;
+          c_tensor.def("__repr__", [](const tensor_type &tensor) {
+            return std::format("{}", tensor);
           });
-
-          if constexpr (std::is_same_v<TLayout, tt::row_major_layout>) {
-            using dtype_class = py::class_<tt::dtype_t<TElement>>;
-
-            const py::arg dtype(
-                std::format("dtype_{}", name_of(tt::dtype<TElement>)).c_str());
-
-            m.def(
-                "empty",
-                [](dtype_class, dependent<Is, std::size_t>... extents) {
-                  return tt::empty<TElement>(extents...);
-                },
-                dtype, args[Is]...);
-
-            m.def(
-                "full",
-                [](TElement fill_value, dependent<Is, std::size_t>... extents) {
-                  return tt::full(fill_value, extents...);
-                },
-                py::arg("fill_value"), args[Is]...);
-
-            m.def(
-                "ones",
-                [](dtype_class, dependent<Is, std::size_t>... extents) {
-                  return tt::ones<TElement>(extents...);
-                },
-                dtype, args[Is]...);
-
-            m.def(
-                "zeros",
-                [](dtype_class, dependent<Is, std::size_t>... extents) {
-                  return tt::zeros<TElement>(extents...);
-                },
-                dtype, args[Is]...);
-          }
-        }(std::make_index_sequence<rank>{});
-
-        m.def(
-            "print",
-            [](std::string_view fmt, const tensor_type &tensor_arg) {
-              std::vformat_to(std::ostreambuf_iterator<char>(std::cout), fmt,
-                              std::make_format_args(tensor_arg));
-            },
-            py::arg("fmt"), py::arg("tensor_arg"));
-      };
-
-  mp::mp_for_each<tensor_traits>(
-      [=]<class TElement, class TExtents, class TLayout>(
-          mp::mp_list<TElement, TExtents, TLayout> traits) {
-        if constexpr (is_tensor_traits_valid_v<TElement, TExtents, TLayout>) {
-          register_tensor_for(traits);
         }
       });
 
-  mp::mp_for_each<element_types>([&]<class TElement>(TElement) {
-    m.def(
-        "arange",
-        [](TElement start, TElement end, TElement step) {
-          return tt::arange<TElement>(start, end, step);
+  const auto default_dtype = std::make_shared<tt::DType>(tt::DType::Float32);
+
+  m.def("set_default_dtype", [=](tt::DType dtype) { *default_dtype = dtype; });
+
+  m.def("get_default_dtype", [=] { return *default_dtype; });
+
+  constexpr auto arange = [](tt::arithmetic auto start, tt::arithmetic auto end,
+                             tt::Float64 step, tt::DType dtype) {
+    return magic_enum::enum_switch(
+        [=](auto dtype) {
+          constexpr auto index = static_cast<std::size_t>(dtype());
+          using TElement = mp::mp_at_c<element_types, index>;
+          return py::cast(tt::arange<TElement>(start, end, step));
         },
-        py::arg("start") = 0, py::arg("end"), py::arg("step") = 1);
-  });
+        dtype);
+  };
+
+  m.def(
+      "arange",
+      [=](tt::Int64 start, tt::Int64 end, tt::Float64 step, tt::DType dtype) {
+        return arange(start, end, step, dtype);
+      },
+      py::arg("start"), py::arg("end"), py::arg("step") = 1, py::kw_only(),
+      py::arg("dtype") = tt::DType::Int64);
+
+  m.def(
+      "arange",
+      [=](tt::Int64 end, tt::DType dtype) { return arange(0, end, 1, dtype); },
+      py::arg("end"), py::kw_only(), py::arg("dtype") = tt::DType::Int64);
+
+  m.def(
+      "arange",
+      [=](tt::Float64 start, tt::Float64 end, tt::Float64 step,
+          std::optional<tt::DType> dtype) {
+        return arange(start, end, step, dtype ? *dtype : *default_dtype);
+      },
+      py::arg("start"), py::arg("end"), py::arg("step") = 1, py::kw_only(),
+      py::arg("dtype") = py::none());
+
+  m.def(
+      "arange",
+      [=](tt::Float64 end, std::optional<tt::DType> dtype) {
+        return arange(0, end, 1, dtype ? *dtype : *default_dtype);
+      },
+      py::arg("end"), py::kw_only(), py::arg("dtype") = py::none());
+
+  m.def(
+      "ones",
+      [=](const py::args &args, std::optional<tt::DType> dtype) {
+        return magic_enum::enum_switch(
+            [&](auto dtype) {
+              constexpr auto index = static_cast<std::size_t>(dtype());
+              using TElement = mp::mp_at_c<element_types, index>;
+
+              return mp::mp_with_index<mp::mp_size<extents_types>::value>(
+                  args.size(), [&](auto rank) {
+                    return [&]<auto... Is>(std::index_sequence<Is...>) {
+                      return py::cast(tt::ones<TElement>(
+                          py::cast<std::size_t>(args[Is])...));
+                    }(std::make_index_sequence<rank>{});
+                  });
+            },
+            dtype ? *dtype : *default_dtype);
+      },
+      py::kw_only(), py::arg("dtype") = py::none());
+
+  m.def(
+      "zeros",
+      [=](const py::args &args, std::optional<tt::DType> dtype) {
+        return magic_enum::enum_switch(
+            [&](auto dtype) {
+              constexpr auto index = static_cast<std::size_t>(dtype());
+              using TElement = mp::mp_at_c<element_types, index>;
+
+              return mp::mp_with_index<mp::mp_size<extents_types>::value>(
+                  args.size(), [&](auto rank) {
+                    return [&]<auto... Is>(std::index_sequence<Is...>) {
+                      return py::cast(tt::zeros<TElement>(
+                          py::cast<std::size_t>(args[Is])...));
+                    }(std::make_index_sequence<rank>{});
+                  });
+            },
+            dtype ? *dtype : *default_dtype);
+      },
+      py::kw_only(), py::arg("dtype") = py::none());
 }
