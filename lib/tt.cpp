@@ -42,9 +42,8 @@ PYBIND11_MODULE(tt, m) {
   namespace py = pybind11;
   namespace mp = boost::mp11;
 
-  constexpr auto bind_enum = []<class T>(std::in_place_type_t<T>,
-                                         const py::handle &handle,
-                                         const char *name) {
+  constexpr auto bind_enum_entries = []<class T>(T, const py::handle &handle,
+                                                 const char *name) {
     using enum_type = T;
     py::enum_<enum_type> type(handle, name);
 
@@ -57,8 +56,8 @@ PYBIND11_MODULE(tt, m) {
     }
   };
 
-  bind_enum(std::in_place_type<tt::DType>, m, "dtype");
-  bind_enum(std::in_place_type<tt::Layout>, m, "layout");
+  bind_enum_entries(tt::DType{}, m, "dtype");
+  bind_enum_entries(tt::Layout{}, m, "layout");
 
   using element_types =
       mp::mp_list<tt::Float32, tt::Float64, tt::BFloat16, tt::UInt8, tt::Int8,

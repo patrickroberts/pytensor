@@ -1,10 +1,8 @@
 #pragma once
 
-#include <cstddef>
-
 namespace tt::inline core {
 
-enum class DType : std::size_t {
+enum class DType {
   Float32,
   Float64,
   BFloat16,
