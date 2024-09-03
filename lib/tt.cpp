@@ -42,9 +42,10 @@ PYBIND11_MODULE(tt, m) {
   namespace py = pybind11;
   namespace mp = boost::mp11;
 
-  constexpr auto bind_enum_entries = []<class T>(T, const py::handle &handle,
-                                                 const char *name) {
-    using enum_type = T;
+  constexpr auto bind_enum_entries = [](auto enum_value,
+                                        const py::handle &handle,
+                                        const char *name) {
+    using enum_type = decltype(enum_value);
     py::enum_<enum_type> type(handle, name);
 
     for (const auto &[value, name] : magic_enum::enum_entries<enum_type>()) {
@@ -118,8 +119,9 @@ PYBIND11_MODULE(tt, m) {
 
   constexpr auto arange = [=](auto start, auto end, tt::Float64 step,
                               tt::DType dtype) {
-    return with_element(dtype, [=]<tt::arithmetic TElement>(TElement) {
-      return py::cast(tt::arange<TElement>(start, end, step));
+    return with_element(dtype, [=](tt::arithmetic auto element) {
+      using element_type = decltype(element);
+      return py::cast(tt::arange<element_type>(start, end, step));
     });
   };
 
@@ -182,9 +184,10 @@ PYBIND11_MODULE(tt, m) {
     return [=](const py::args &args, std::optional<tt::DType> dtype) {
       return with_element_and_extents(
           value_or_default(dtype), args,
-          [&]<tt::arithmetic TElement>(TElement, auto... extents) {
+          [&](tt::arithmetic auto element, auto... extents) {
+            using element_type = decltype(element);
             return py::cast(
-                tt::full(static_cast<TElement>(fill_value), extents...));
+                tt::full(static_cast<element_type>(fill_value), extents...));
           });
     };
   };
