@@ -3,24 +3,24 @@
 #include <tt/operators/dot.hpp>
 #include <tt/operators/empty.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 
 template <class TLhs, class TRhs>
-concept has_matrix_product =
+TT_CONCEPT has_matrix_product =
     tt::matrix<TLhs> and tt::matrix<TRhs> and
-    tt::common_element_type_with<TLhs, TRhs> and
     tt::common_extent_with<TLhs::static_extent(1), TRhs::static_extent(0)>;
 
-template <class TLhs, class TRhs>
-  requires tt::has_matrix_product<TLhs, TRhs>
-using matrix_product_result_t = tt::row_major_matrix<
+template <class TLhs, class TRhs,
+          class = TT_REQUIRES(tt::has_matrix_product<TLhs, TRhs>)>
+using matrix_product_result_t = tt::RowMajorMatrix<
     tt::common_element_type_t<TLhs, TRhs>,
     std::extents<std::size_t, TLhs::static_extent(0), TRhs::static_extent(1)>>;
 
 struct matmul_fn {
 private:
-  template <std::size_t Index, tt::tensor T>
-  static constexpr tt::index auto get_extent(const T &t) noexcept {
+  template <std::size_t Index, class T, class = TT_REQUIRES(tt::tensor<T>)>
+  static constexpr auto get_extent(const T &t) noexcept {
     static_assert(Index < T::rank());
 
     if constexpr (T::static_extent(Index) == std::dynamic_extent) {
@@ -58,4 +58,5 @@ public:
 
 inline constexpr tt::matmul_fn matmul{};
 
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

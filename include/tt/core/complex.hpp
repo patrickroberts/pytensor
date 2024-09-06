@@ -3,12 +3,14 @@
 
 #include <complex>
 
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 
 using Complex64 = std::complex<tt::Float32>;
 using Complex128 = std::complex<tt::Float64>;
 
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt
 
 template <class T>
 inline constexpr bool tt::is_arithmetic_v<std::complex<T>> =

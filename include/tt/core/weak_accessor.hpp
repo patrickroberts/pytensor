@@ -5,9 +5,10 @@
 #include <cassert>
 #include <memory>
 
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 
-template <tt::arithmetic T>
+template <class T, class TEnable>
 struct weak_accessor {
   using offset_policy = weak_accessor;
   using element_type = T;
@@ -16,13 +17,15 @@ struct weak_accessor {
 
   constexpr weak_accessor() noexcept = default;
 
-  template <class TOtherElement>
-    requires std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>
+  template <class TOtherElement,
+            class = TT_REQUIRES(
+                std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
   constexpr weak_accessor(
       const shared_accessor<TOtherElement, weak_offset_policy> &) noexcept {}
 
-  template <class TOtherElement>
-    requires std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>
+  template <class TOtherElement,
+            class = TT_REQUIRES(
+                std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
   constexpr weak_accessor(const weak_accessor<TOtherElement> &) noexcept {}
 
   static constexpr reference access(const data_handle_type &data_handle,
@@ -47,4 +50,5 @@ struct weak_accessor {
   }
 };
 
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt

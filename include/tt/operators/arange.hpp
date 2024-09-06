@@ -2,12 +2,13 @@
 
 #include <tt/operators/empty.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 
-template <tt::arithmetic T>
+template <class T, class = TT_REQUIRES(tt::arithmetic<T>)>
 struct arange_fn {
-  constexpr tt::RowMajorVector<T> operator()(T start, T end,
-                                             tt::arithmetic auto step) const {
+  template <class TStep, class = TT_REQUIRES(tt::arithmetic<TStep>)>
+  constexpr tt::RowMajorVector<T> operator()(T start, T end, TStep step) const {
     const std::size_t size = static_cast<T>(end - start - 1) / step + 1;
     const auto result = tt::empty<T>(size);
 
@@ -29,7 +30,8 @@ struct arange_fn {
   }
 };
 
-template <tt::arithmetic T>
+template <class T, class = TT_REQUIRES(tt::arithmetic<T>)>
 inline constexpr tt::arange_fn<T> arange{};
 
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

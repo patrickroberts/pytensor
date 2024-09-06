@@ -4,7 +4,8 @@
 
 #include <experimental/mdspan>
 
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 
 struct slice_fn {
 private:
@@ -15,19 +16,22 @@ private:
   static constexpr default_stride_type default_stride{};
 
 public:
-  template <tt::index TOffset, tt::index TExtent, tt::index TStride>
+  template <class TOffset, class TExtent, class TStride,
+            class = TT_REQUIRES(tt::index<TOffset> and tt::index<TExtent> and
+                                tt::index<TStride>)>
   constexpr std::strided_slice<TOffset, TExtent, TStride>
   operator()(TOffset offset, TExtent extent, TStride stride) const {
     return {offset, extent, stride};
   }
 
-  template <tt::index TOffset, tt::index TExtent>
+  template <class TOffset, class TExtent,
+            class = TT_REQUIRES(tt::index<TOffset> and tt::index<TExtent>)>
   constexpr std::strided_slice<TOffset, TExtent, default_stride_type>
   operator()(TOffset offset, TExtent extent) const {
     return tt::slice_fn{}(offset, extent, default_stride);
   }
 
-  template <tt::index TExtent>
+  template <class TExtent, class = TT_REQUIRES(tt::index<TExtent>)>
   constexpr std::strided_slice<default_offset_type, TExtent,
                                default_stride_type>
   operator()(TExtent extent) const {
@@ -37,4 +41,5 @@ public:
 
 inline constexpr tt::slice_fn slice{};
 
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt

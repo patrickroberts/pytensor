@@ -9,33 +9,17 @@ project(
   VERSION 1.0.0
   LANGUAGES CXX)
 
-include(FetchContent)
-
-FetchContent_Declare(
-  boost_mp11
-  GIT_REPOSITORY https://github.com/boostorg/mp11.git
-  GIT_TAG boost-1.86.0)
-FetchContent_Declare(
-  magic_enum
-  GIT_REPOSITORY https://github.com/Neargye/magic_enum.git
-  GIT_TAG v0.9.6)
-FetchContent_Declare(
-  mdspan
-  GIT_REPOSITORY https://github.com/kokkos/mdspan.git
-  GIT_TAG stable)
-FetchContent_Declare(
-  pybind11
-  GIT_REPOSITORY https://github.com/pybind/pybind11.git
-  GIT_TAG v2.13.5)
-FetchContent_MakeAvailable(boost_mp11 magic_enum mdspan pybind11)
+include(cmake/python-config.cmake)
+include(cmake/deps-config.cmake)
 
 add_library(tensor_flags INTERFACE)
 target_compile_options(tensor_flags INTERFACE -Wall -Wextra -Werror)
 target_include_directories(tensor_flags
                            INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
-target_link_libraries(tensor_flags INTERFACE boost_mp11 magic_enum mdspan)
+target_link_libraries(tensor_flags INTERFACE boost_mp11 fmt::fmt-header-only
+                                             magic_enum mdspan)
 
-pybind11_add_module(tt lib/tt.cpp)
+nanobind_add_module(tt lib/tt.cpp)
 target_link_libraries(tt PRIVATE tensor_flags)
 add_library(tensor::lib ALIAS tt)
 

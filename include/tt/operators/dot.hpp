@@ -2,16 +2,16 @@
 
 #include <tt/core/concepts.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 
 template <class TLhs, class TRhs>
-concept has_dot_product =
+TT_CONCEPT has_dot_product =
     tt::vector<TLhs> and tt::vector<TRhs> and
-    tt::common_element_type_with<TLhs, TRhs> and
     tt::common_extent_with<TLhs::static_extent(0), TRhs::static_extent(0)>;
 
-template <class TLhs, class TRhs>
-  requires tt::has_dot_product<TLhs, TRhs>
+template <class TLhs, class TRhs,
+          class = TT_REQUIRES(tt::has_dot_product<TLhs, TRhs>)>
 using dot_product_result_t = tt::common_element_type_t<TLhs, TRhs>;
 
 struct dot_fn {
@@ -35,4 +35,5 @@ struct dot_fn {
 
 inline constexpr tt::dot_fn dot{};
 
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

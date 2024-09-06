@@ -2,9 +2,11 @@
 
 #include <tt/operators/detail/fill.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 
-template <tt::arithmetic T>
+template <class T, class = TT_REQUIRES(tt::arithmetic<T>)>
 inline constexpr detail::fill_fn<T, 1> ones{};
 
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

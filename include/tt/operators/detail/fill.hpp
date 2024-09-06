@@ -2,10 +2,11 @@
 
 #include <tt/operators/full.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 namespace detail {
 
-template <tt::arithmetic T, int V>
+template <class T, int V, class = TT_REQUIRES(tt::arithmetic<T>)>
 struct fill_fn {
 private:
   static constexpr T fill_value{V};
@@ -19,4 +20,5 @@ public:
 };
 
 } // namespace detail
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

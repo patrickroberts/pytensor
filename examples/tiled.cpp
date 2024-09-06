@@ -4,8 +4,7 @@
 #include <tt/operators/reshape.hpp>
 #include <tt/operators/to_layout.hpp>
 
-#include <format>
-#include <iostream>
+#include <fmt/base.h>
 
 int main() {
   // create a 3x5x7 tiled tensor of bfloat16...
@@ -20,9 +19,8 @@ int main() {
   // create a 3x2x2x4x4 view of the tiled tensor
   const auto tiled_5d = tiled_3d | tt::reshape(3, 2, 2, 4, 4);
 
-  std::format_to(std::ostreambuf_iterator{std::cout},
-                 "3x5x7:\n{:>3}\n"
-                 "3x8x8:\n{:>3}\n"
-                 "3x2x2x4x4:\n{:>3}\n",
-                 tiled_3d, tiled_padded, tiled_5d);
+  fmt::print("3x5x7:\n{:>3}\n"
+             "3x8x8:\n{:>3}\n"
+             "3x2x2x4x4:\n{:>3}\n",
+             tiled_3d, tiled_padded, tiled_5d);
 }

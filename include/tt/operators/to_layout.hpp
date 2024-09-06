@@ -3,11 +3,12 @@
 #include <tt/core/layout.hpp>
 #include <tt/core/tensor.hpp>
 
-namespace tt::inline operators {
+namespace tt {
+inline namespace operators {
 
 template <class TLayout>
 struct to_layout_view {
-  template <tt::tensor TInput>
+  template <class TInput, class = TT_REQUIRES(tt::tensor<TInput>)>
   friend constexpr tt::Tensor<tt::element_type_t<TInput>,
                               tt::extents_type_t<TInput>, TLayout>
   operator|(const TInput &input, to_layout_view to_layout) {
@@ -47,7 +48,7 @@ template <class TLayout>
 struct to_layout_fn {
   constexpr tt::to_layout_view<TLayout> operator()() const { return {}; }
 
-  template <tt::tensor TInput>
+  template <class TInput, class = TT_REQUIRES(tt::tensor<TInput>)>
   constexpr tt::Tensor<tt::element_type_t<TInput>, tt::extents_type_t<TInput>,
                        TLayout>
   operator()(const TInput &input) const {
@@ -62,4 +63,5 @@ inline constexpr tt::to_layout_fn<tt::Tiled> to_tiled{};
 
 inline constexpr tt::to_layout_fn<tt::RowMajor> to_row_major{};
 
-} // namespace tt::inline operators
+} // namespace operators
+} // namespace tt

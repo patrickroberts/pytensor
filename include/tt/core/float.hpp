@@ -1,14 +1,14 @@
 #pragma once
 
+#include <tt/core/bit.hpp>
 #include <tt/core/type_traits.hpp>
 
-#include <bit>
 #include <cmath>
 #include <cstdint>
 #include <limits>
-#include <stdfloat>
 
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 
 using Float32 = float;
 using Float64 = double;
@@ -23,7 +23,7 @@ namespace {
 inline constexpr std::uint16_t BFloat16_quiet_NaN = 0x7FC0;
 
 constexpr std::uint16_t round_to_nearest_even(tt::Float32 value) noexcept {
-  const auto input = std::bit_cast<std::uint32_t>(value);
+  const auto input = tt::bit_cast<std::uint32_t>(value);
 
   if (std::isnan(value)) {
     const std::uint16_t sign = (input >> 16) & 0x8000;
@@ -45,14 +45,15 @@ private:
   std::uint16_t value;
 
 public:
-  constexpr explicit(false) BFloat16() noexcept = default;
+  // GCC bug disallows constexpr keyword on explicitly defaulted function
+  inline TT_EXPLICIT(false) BFloat16() noexcept = default;
 
-  constexpr explicit(false) BFloat16(tt::Float32 other) noexcept
+  constexpr TT_EXPLICIT(false) BFloat16(tt::Float32 other) noexcept
       : value(tt::round_to_nearest_even(other)) {}
 
-  [[nodiscard]] constexpr explicit(false)
+  [[nodiscard]] constexpr TT_EXPLICIT(false)
   operator tt::Float32() const noexcept {
-    return std::bit_cast<tt::Float32>(static_cast<std::uint32_t>(value) << 16);
+    return tt::bit_cast<tt::Float32>(static_cast<std::uint32_t>(value) << 16);
   }
 
   constexpr tt::BFloat16 &operator++() noexcept { return *this += 1.f; }
@@ -109,7 +110,8 @@ constexpr tt::BFloat16 operator""_bf16(long double value) noexcept {
 
 } // namespace numeric_literals
 } // namespace literals
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt
 
 template <>
 struct std::common_type<tt::BFloat16, tt::Float32> {
@@ -149,26 +151,26 @@ struct std::numeric_limits<tt::BFloat16> {
 
   static constexpr tt::BFloat16 min() noexcept {
     constexpr auto min_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0x0080);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0x0080);
     return min_value;
   }
 
   static constexpr tt::BFloat16 lowest() noexcept {
     constexpr auto lowest_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0xFF7F);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0xFF7F);
     return lowest_value;
   }
 
   static constexpr tt::BFloat16 max() noexcept {
     constexpr auto max_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0x7F7F);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0x7F7F);
     return max_value;
   }
 
   static constexpr tt::BFloat16 epsilon() noexcept {
     constexpr tt::BFloat16 epsilon_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(
-            std::bit_cast<std::uint16_t, tt::BFloat16>(1) + 1) -
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(
+            tt::bit_cast<std::uint16_t, tt::BFloat16>(1) + 1) -
         1.f;
     return epsilon_value;
   }
@@ -180,25 +182,25 @@ struct std::numeric_limits<tt::BFloat16> {
 
   static constexpr tt::BFloat16 infinity() noexcept {
     constexpr auto infinity_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0x7F80);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0x7F80);
     return infinity_value;
   }
 
   static constexpr tt::BFloat16 quiet_NaN() noexcept {
     constexpr auto quiet_NaN_value =
-        std::bit_cast<tt::BFloat16>(tt::BFloat16_quiet_NaN);
+        tt::bit_cast<tt::BFloat16>(tt::BFloat16_quiet_NaN);
     return quiet_NaN_value;
   }
 
   static constexpr tt::BFloat16 signaling_NaN() noexcept {
     constexpr auto signaling_NaN_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0x7FA0);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0x7FA0);
     return signaling_NaN_value;
   }
 
   static constexpr tt::BFloat16 denorm_min() noexcept {
     constexpr auto denorm_min_value =
-        std::bit_cast<tt::BFloat16, std::uint16_t>(0x0001);
+        tt::bit_cast<tt::BFloat16, std::uint16_t>(0x0001);
     return denorm_min_value;
   }
 };

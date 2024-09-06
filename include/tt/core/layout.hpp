@@ -1,12 +1,12 @@
 #pragma once
 
+#include <tt/core/bit.hpp>
 #include <tt/core/concepts.hpp>
 
 #include <experimental/mdspan>
 
-#include <bit>
-
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 namespace {
 
 constexpr std::size_t find_next_multiple(std::size_t alignment,
@@ -40,10 +40,10 @@ private:
 
   static_assert(tile_height != std::dynamic_extent and
                 tile_width != std::dynamic_extent);
-  static_assert(std::has_single_bit(tile_size));
+  static_assert(tt::has_single_bit(tile_size));
 
 public:
-  template <tt::extents TExtents>
+  template <class TExtents, class = TT_REQUIRES(tt::extents<TExtents>)>
   struct mapping {
     static_assert(TExtents::rank() >= 2);
 
@@ -76,9 +76,9 @@ public:
              (col % tile_width);
     }
 
-    constexpr index_type
-    accumulate_offset(index_type value, index_type index,
-                      std::same_as<index_type> auto... indices) const noexcept {
+    template <class... TIndices>
+    constexpr index_type accumulate_offset(index_type value, index_type index,
+                                           TIndices... indices) const noexcept {
       if constexpr (sizeof...(indices) == 2) {
         return this->accumulate_offset(this->pads.extent(0) * (value + index),
                                        indices...);
@@ -100,15 +100,19 @@ public:
     constexpr mapping(const extents_type &exts) noexcept
         : exts(exts), pads(mapping::make_padding(exts)) {}
 
-    template <tt::mapping<layout_type> TMapping>
-      requires(TMapping::extents_type::rank() == extents_type::rank())
+    template <class TMapping,
+              class = TT_REQUIRES(tt::mapping<TMapping, layout_type> and
+                                  TMapping::extents_type::rank() ==
+                                      extents_type::rank())>
     constexpr bool operator==(const TMapping &rhs) const noexcept {
       return this->exts == rhs.extents();
     }
 
     constexpr const extents_type &extents() const noexcept { return exts; }
 
-    constexpr index_type operator()(tt::index auto... indices) const noexcept {
+    template <class... TIndices,
+              class = TT_REQUIRES((... and tt::index<TIndices>))>
+    constexpr index_type operator()(TIndices... indices) const noexcept {
       return this->accumulate_offset(0, static_cast<index_type>(indices)...);
     }
 
@@ -167,10 +171,11 @@ using RowMajor = std::layout_right;
 using Strided = std::layout_stride;
 using Tiled = tt::layout_right_tiled<>;
 
-enum class Layout {
+enum class layout {
   RowMajor,
   Strided,
   Tiled,
 };
 
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt

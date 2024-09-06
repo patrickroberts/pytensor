@@ -1,12 +1,13 @@
 #pragma once
 
-namespace tt::inline core {
+namespace tt {
+inline namespace core {
 
-enum class DType {
+enum class dtype {
   Float32,
   Float64,
   BFloat16,
-  Uint8,
+  UInt8,
   Int8,
   Int16,
   Int32,
@@ -14,4 +15,5 @@ enum class DType {
   Bool,
 };
 
-} // namespace tt::inline core
+} // namespace core
+} // namespace tt
