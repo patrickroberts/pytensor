@@ -13,8 +13,8 @@ private:
 
 public:
   template <class... TIndices>
-  constexpr tt::RowMajorTensor<T, tt::extents_from<TIndices...>>
-  operator()(TIndices... extents) const {
+  constexpr auto operator()(TIndices... extents) const
+      -> tt::RowMajorTensor<T, tt::extents_from<TIndices...>> {
     return tt::full(fill_value, extents...);
   }
 };

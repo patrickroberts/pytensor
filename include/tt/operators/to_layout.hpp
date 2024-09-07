@@ -1,57 +1,63 @@
 #pragma once
 
 #include <tt/core/layout.hpp>
+#include <tt/core/memory.hpp>
 #include <tt/core/tensor.hpp>
 
 namespace tt {
 inline namespace operators {
 
 template <class TLayout>
-struct to_layout_view {
-  template <class TInput, class = TT_REQUIRES(tt::tensor<TInput>)>
-  friend constexpr tt::Tensor<tt::element_type_t<TInput>,
-                              tt::extents_type_t<TInput>, TLayout>
-  operator|(const TInput &input, to_layout_view to_layout) {
-    using output_type = decltype(input | to_layout);
-    using element_type = tt::element_type_t<output_type>;
-    using extents_type = tt::extents_type_t<output_type>;
-    using index_type = tt::index_type_t<output_type>;
-    using mapping_type = TLayout::template mapping<extents_type>;
+struct to_layout_view {};
 
-    const mapping_type mapping{input.extents()};
-    const auto required_span_size = mapping.required_span_size();
-    const output_type output{
-        mapping.is_exhaustive()
-            ? std::make_shared_for_overwrite<element_type[]>(required_span_size)
-            : std::make_shared<element_type[]>(required_span_size),
-        mapping};
+template <class TInput, class TLayout>
+constexpr auto operator|(const TInput &input,
+                         const to_layout_view<TLayout> &to_layout)
+    -> TT_REQUIRES(tt::tensor<TInput>,
+                   tt::Tensor<tt::element_type_t<TInput>,
+                              tt::extents_type_t<TInput>, TLayout>) {
+  using output_type = decltype(input | to_layout);
+  using element_type = tt::element_type_t<output_type>;
+  using extents_type = tt::extents_type_t<output_type>;
+  using index_type = tt::index_type_t<output_type>;
+  using mapping_type = typename TLayout::template mapping<extents_type>;
 
-    const auto recur = [&](const auto &recur, auto... indices) {
-      constexpr auto rank = sizeof...(indices);
+  const mapping_type mapping{input.extents()};
+  const auto count = mapping.required_span_size();
+  const output_type output{
+      mapping.is_exhaustive()
+          ? tt::make_shared_for_overwrite<element_type[]>(count)
+          : tt::make_shared<element_type[]>(count),
+      mapping};
 
-      if constexpr (rank == output_type::rank()) {
-        output(indices...) = input(indices...);
-      } else {
-        for (index_type index = 0; index < output.extent(rank); ++index) {
-          recur(recur, indices..., index);
-        }
+  const auto recur = [&](const auto &recur, auto... indices) {
+    constexpr auto rank = sizeof...(indices);
+
+    if constexpr (rank == output_type::rank()) {
+      output(indices...) = input(indices...);
+    } else {
+      for (index_type index = 0; index < output.extent(rank); ++index) {
+        recur(recur, indices..., index);
       }
-    };
+    }
+  };
 
-    recur(recur);
+  recur(recur);
 
-    return output;
-  }
-};
+  return output;
+}
 
 template <class TLayout>
 struct to_layout_fn {
-  constexpr tt::to_layout_view<TLayout> operator()() const { return {}; }
+  constexpr auto operator()() const -> tt::to_layout_view<TLayout> {
+    return {};
+  }
 
-  template <class TInput, class = TT_REQUIRES(tt::tensor<TInput>)>
-  constexpr tt::Tensor<tt::element_type_t<TInput>, tt::extents_type_t<TInput>,
-                       TLayout>
-  operator()(const TInput &input) const {
+  template <class TInput>
+  constexpr auto operator()(const TInput &input) const
+      -> TT_REQUIRES(tt::tensor<TInput>,
+                     tt::Tensor<tt::element_type_t<TInput>,
+                                tt::extents_type_t<TInput>, TLayout>) {
     return input | to_layout_fn{}();
   }
 };

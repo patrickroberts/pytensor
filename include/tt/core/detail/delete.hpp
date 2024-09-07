@@ -3,7 +3,7 @@
 #include <memory>
 
 namespace tt {
-inline namespace operators {
+inline namespace core {
 namespace detail {
 
 template <class T>
@@ -18,9 +18,9 @@ public:
                              const std::size_t elements) noexcept
       : alloc(alloc), elements(elements) {}
 
-  constexpr void operator()(T *ptr) { alloc.deallocate(ptr, elements); }
+  constexpr auto operator()(T *ptr) -> void { alloc.deallocate(ptr, elements); }
 };
 
 } // namespace detail
-} // namespace operators
+} // namespace core
 } // namespace tt

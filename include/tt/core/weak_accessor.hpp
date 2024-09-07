@@ -28,8 +28,8 @@ struct weak_accessor {
                 std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
   constexpr weak_accessor(const weak_accessor<TOtherElement> &) noexcept {}
 
-  static constexpr reference access(const data_handle_type &data_handle,
-                                    std::size_t index) noexcept {
+  static constexpr auto access(const data_handle_type &data_handle,
+                               std::size_t index) noexcept -> reference {
     const auto locked_data_handle = data_handle.lock();
 
     assert(locked_data_handle);
@@ -37,8 +37,9 @@ struct weak_accessor {
     return locked_data_handle[index];
   }
 
-  static constexpr offset_policy::data_handle_type
-  offset(const data_handle_type &data_handle, std::size_t index) noexcept {
+  static constexpr auto
+  offset(const data_handle_type &data_handle,
+         std::size_t index) noexcept -> offset_policy::data_handle_type {
     const auto locked_data_handle = data_handle.lock();
 
     assert(locked_data_handle);

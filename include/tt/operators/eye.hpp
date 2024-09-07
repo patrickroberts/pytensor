@@ -12,8 +12,8 @@ private:
 
 public:
   template <class TRows, class TCols>
-  constexpr tt::RowMajorMatrix<T, tt::extents_from<TRows, TCols>>
-  operator()(TRows rows, TCols cols) const {
+  constexpr auto operator()(TRows rows, TCols cols) const
+      -> tt::RowMajorMatrix<T, tt::extents_from<TRows, TCols>> {
     const auto result = zeros<T>(rows, cols);
     const auto diagonal_size = std::min<std::size_t>(rows, cols);
 
@@ -25,8 +25,8 @@ public:
   }
 
   template <class TIndex>
-  constexpr tt::RowMajorMatrix<T, tt::extents_from<TIndex, TIndex>>
-  operator()(TIndex extent) const {
+  constexpr auto operator()(TIndex extent) const
+      -> tt::RowMajorMatrix<T, tt::extents_from<TIndex, TIndex>> {
     return eye_fn{}(extent, extent);
   }
 };

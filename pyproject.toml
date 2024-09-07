@@ -1,0 +1,20 @@
+[build-system]
+requires = ["scikit-build-core >=0.10.5"]
+build-backend = "scikit_build_core.build"
+
+[project]
+name = "tt"
+version = "1.0.0"
+requires-python = ">=3.8"
+authors = [
+  { name = "Patrick Roberts" },
+]
+
+[tool.scikit-build]
+minimum-version = "0.10"
+cmake.define = { TT_EXAMPLES = "OFF" }
+
+build-dir = "build/{wheel_tag}"
+
+[tool.cibuildwheel]
+build-verbosity = 1

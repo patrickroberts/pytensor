@@ -22,17 +22,18 @@ using std::has_single_bit;
 namespace tt {
 inline namespace core {
 
-template <class TTo, class TFrom,
-          class = TT_REQUIRES(std::is_trivially_copyable_v<TTo> and
-                              std::is_trivially_copyable_v<TFrom> and
-                              sizeof(TTo) == sizeof(TFrom))>
-[[nodiscard]] constexpr TTo bit_cast(const TFrom &from) noexcept {
+template <class TTo, class TFrom>
+[[nodiscard]] constexpr auto bit_cast(const TFrom &from) noexcept
+    -> TT_REQUIRES(std::is_trivially_copyable_v<TTo>
+                           and std::is_trivially_copyable_v<TFrom> and
+                       sizeof(TTo) == sizeof(TFrom),
+                   TTo) {
   return __builtin_bit_cast(TTo, from);
 }
 
-template <class T,
-          class = TT_REQUIRES(std::is_unsigned_v<T> and std::is_integral_v<T>)>
-constexpr bool has_single_bit(T value) noexcept {
+template <class T>
+[[nodiscard]] constexpr auto has_single_bit(T value) noexcept
+    -> TT_REQUIRES(std::is_unsigned_v<T> and std::is_integral_v<T>, bool) {
   return __builtin_popcountll(value) == 1;
 }
 

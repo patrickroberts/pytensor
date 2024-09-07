@@ -14,13 +14,13 @@ private:
   fmt::formatter<element_type> element_formatter{};
 
 public:
-  constexpr fmt::format_parse_context::iterator
-  parse(fmt::format_parse_context &ctx) {
+  constexpr auto
+  parse(fmt::format_parse_context &ctx) -> fmt::format_parse_context::iterator {
     return element_formatter.parse(ctx);
   }
 
-  constexpr fmt::format_context::iterator
-  format(const TInput &input, fmt::format_context &ctx) const {
+  constexpr auto format(const TInput &input, fmt::format_context &ctx) const
+      -> fmt::format_context::iterator {
     if constexpr (TInput::rank() == 0) {
       auto out = fmt::format_to(ctx.out(), "tensor(");
       out = element_formatter.format(+input(), ctx);

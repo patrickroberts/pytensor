@@ -9,8 +9,8 @@ namespace tt {
 inline namespace core {
 namespace {
 
-constexpr std::size_t find_next_multiple(std::size_t alignment,
-                                         std::size_t offset) {
+constexpr auto find_next_multiple(std::size_t alignment,
+                                  std::size_t offset) noexcept -> std::size_t {
   if (offset == std::dynamic_extent) {
     return offset;
   }
@@ -56,8 +56,8 @@ public:
   private:
     using padding_type = layout_right_tiled::padding<TExtents>;
 
-    static constexpr padding_type
-    make_padding(const extents_type &exts) noexcept {
+    static constexpr auto
+    make_padding(const extents_type &exts) noexcept -> padding_type {
       return padding_type{
           tt::find_next_multiple(tile_height,
                                  exts.extent(TExtents::rank() - 2)),
@@ -68,8 +68,9 @@ public:
     [[no_unique_address]] extents_type exts;
     [[no_unique_address]] padding_type pads;
 
-    constexpr index_type accumulate_offset(index_type value, index_type row,
-                                           index_type col) const noexcept {
+    constexpr auto
+    accumulate_offset(index_type value, index_type row,
+                      index_type col) const noexcept -> index_type {
       return this->pads.extent(1) *
                  (value + (row / tile_height) * tile_height) +
              (row % tile_height) * tile_width + (col / tile_width) * tile_size +
@@ -77,8 +78,9 @@ public:
     }
 
     template <class... TIndices>
-    constexpr index_type accumulate_offset(index_type value, index_type index,
-                                           TIndices... indices) const noexcept {
+    constexpr auto
+    accumulate_offset(index_type value, index_type index,
+                      TIndices... indices) const noexcept -> index_type {
       if constexpr (sizeof...(indices) == 2) {
         return this->accumulate_offset(this->pads.extent(0) * (value + index),
                                        indices...);
@@ -95,32 +97,35 @@ public:
 
     constexpr mapping(const mapping &) noexcept = default;
 
-    constexpr mapping &operator=(const mapping &) noexcept = default;
+    constexpr auto operator=(const mapping &) noexcept -> mapping & = default;
 
     constexpr mapping(const extents_type &exts) noexcept
         : exts(exts), pads(mapping::make_padding(exts)) {}
 
-    template <class TMapping,
-              class = TT_REQUIRES(tt::mapping<TMapping, layout_type> and
-                                  TMapping::extents_type::rank() ==
-                                      extents_type::rank())>
-    constexpr bool operator==(const TMapping &rhs) const noexcept {
+    template <class TMapping>
+    constexpr auto operator==(const TMapping &rhs) const noexcept
+        -> TT_REQUIRES(tt::mapping<TMapping, layout_type>
+                               and TMapping::extents_type::rank() ==
+                           extents_type::rank(),
+                       bool) {
       return this->exts == rhs.extents();
     }
 
-    constexpr const extents_type &extents() const noexcept { return exts; }
+    constexpr auto extents() const noexcept -> const extents_type & {
+      return exts;
+    }
 
-    template <class... TIndices,
-              class = TT_REQUIRES((... and tt::index<TIndices>))>
-    constexpr index_type operator()(TIndices... indices) const noexcept {
+    template <class... TIndices>
+    constexpr auto operator()(TIndices... indices) const noexcept
+        -> TT_REQUIRES((... and tt::index<TIndices>), index_type) {
       return this->accumulate_offset(0, static_cast<index_type>(indices)...);
     }
 
-    constexpr index_type required_span_size() const noexcept {
+    constexpr auto required_span_size() const noexcept -> index_type {
       return this->exts.extent(0) * this->stride(0);
     }
 
-    constexpr index_type stride(rank_type r) const noexcept {
+    constexpr auto stride(rank_type r) const noexcept -> index_type {
       constexpr rank_type unpadded_ranks = extents_type::rank() - 2;
 
       assert(r < unpadded_ranks);
@@ -134,11 +139,11 @@ public:
       return value;
     }
 
-    static constexpr bool is_always_unique() noexcept { return true; }
+    static constexpr auto is_always_unique() noexcept -> bool { return true; }
 
-    static constexpr bool is_always_strided() noexcept { return false; }
+    static constexpr auto is_always_strided() noexcept -> bool { return false; }
 
-    static constexpr bool is_always_exhaustive() noexcept {
+    static constexpr auto is_always_exhaustive() noexcept -> bool {
       constexpr rank_type rank = extents_type::rank();
 
       if constexpr (extents_type::static_extent(rank - 2) ==
@@ -154,16 +159,16 @@ public:
       }
     }
 
-    static constexpr bool is_unique() noexcept { return true; }
+    static constexpr auto is_unique() noexcept -> bool { return true; }
 
-    constexpr bool is_exhaustive() const noexcept {
+    constexpr auto is_exhaustive() const noexcept -> bool {
       constexpr rank_type rank = extents_type::rank();
 
       return this->exts.extent(rank - 2) == this->pads.extent(0) and
              this->exts.extent(rank - 1) == this->pads.extent(1);
     }
 
-    static constexpr bool is_strided() noexcept { return false; }
+    static constexpr auto is_strided() noexcept -> bool { return false; }
   };
 };
 

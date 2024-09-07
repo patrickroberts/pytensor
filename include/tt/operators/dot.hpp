@@ -10,14 +10,14 @@ TT_CONCEPT has_dot_product =
     tt::vector<TLhs> and tt::vector<TRhs> and
     tt::common_extent_with<TLhs::static_extent(0), TRhs::static_extent(0)>;
 
-template <class TLhs, class TRhs,
-          class = TT_REQUIRES(tt::has_dot_product<TLhs, TRhs>)>
-using dot_product_result_t = tt::common_element_type_t<TLhs, TRhs>;
+template <class TLhs, class TRhs>
+using dot_product_result_t = TT_REQUIRES(tt::has_dot_product<TLhs, TRhs>,
+                                         tt::common_element_type_t<TLhs, TRhs>);
 
 struct dot_fn {
   template <class TLhs, class TRhs>
-  constexpr tt::dot_product_result_t<TLhs, TRhs>
-  operator()(const TLhs &lhs, const TRhs &rhs) const {
+  constexpr auto operator()(const TLhs &lhs, const TRhs &rhs) const
+      -> tt::dot_product_result_t<TLhs, TRhs> {
     assert(lhs.size() == rhs.size());
 
     using result_type = decltype(dot_fn{}(lhs, rhs));

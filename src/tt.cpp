@@ -45,7 +45,7 @@ namespace py = nanobind;
 namespace mp = boost::mp11;
 
 template <class TEnum, class = TT_REQUIRES(std::is_enum_v<TEnum>)>
-constexpr void bind_enum(const py::handle &handle) {
+constexpr auto bind_enum(const py::handle &handle) -> void {
   constexpr auto type_name = magic_enum::enum_type_name<TEnum>();
 
   py::enum_<TEnum> type(handle, type_name.data());
@@ -65,7 +65,7 @@ constexpr auto apply_extents(const py::args &args, TCallback callback,
   return callback(py::cast<std::size_t>(args[Is])...);
 }
 
-NB_MODULE(tt, m) {
+NB_MODULE(_tt, m) {
   bind_enum<tt::dtype>(m);
   bind_enum<tt::layout>(m);
 
@@ -134,7 +134,7 @@ NB_MODULE(tt, m) {
         [&](auto... args) {
           const auto arg = [&] {
             if constexpr ((... and std::is_integral_v<decltype(args)>)) {
-              return dtype ? *dtype : tt::dtype::Int64;
+              return dtype.value_or(tt::dtype::Int64);
             } else {
               return value_or_default(dtype);
             }

@@ -11,11 +11,12 @@ TT_CONCEPT has_matrix_product =
     tt::matrix<TLhs> and tt::matrix<TRhs> and
     tt::common_extent_with<TLhs::static_extent(1), TRhs::static_extent(0)>;
 
-template <class TLhs, class TRhs,
-          class = TT_REQUIRES(tt::has_matrix_product<TLhs, TRhs>)>
-using matrix_product_result_t = tt::RowMajorMatrix<
-    tt::common_element_type_t<TLhs, TRhs>,
-    std::extents<std::size_t, TLhs::static_extent(0), TRhs::static_extent(1)>>;
+template <class TLhs, class TRhs>
+using matrix_product_result_t = TT_REQUIRES(
+    tt::has_matrix_product<TLhs, TRhs>,
+    tt::RowMajorMatrix<tt::common_element_type_t<TLhs, TRhs>,
+                       std::extents<std::size_t, TLhs::static_extent(0),
+                                    TRhs::static_extent(1)>>);
 
 struct matmul_fn {
 private:
@@ -32,8 +33,8 @@ private:
 
 public:
   template <class TLhs, class TRhs>
-  constexpr tt::matrix_product_result_t<TLhs, TRhs>
-  operator()(const TLhs &lhs, const TRhs &rhs) const {
+  constexpr auto operator()(const TLhs &lhs, const TRhs &rhs) const
+      -> tt::matrix_product_result_t<TLhs, TRhs> {
     assert(lhs.extent(1) == rhs.extent(0));
 
     using result_type = decltype(matmul_fn{}(lhs, rhs));

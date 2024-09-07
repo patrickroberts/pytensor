@@ -22,13 +22,14 @@ struct shared_accessor {
   constexpr shared_accessor(
       const shared_accessor<TOtherElement, TOffsetPolicy> &) noexcept {}
 
-  static constexpr reference access(const data_handle_type &data_handle,
-                                    std::size_t index) noexcept {
+  static constexpr auto access(const data_handle_type &data_handle,
+                               std::size_t index) noexcept -> reference {
     return data_handle[index];
   }
 
-  static constexpr typename offset_policy::data_handle_type
-  offset(const data_handle_type &data_handle, std::size_t index) noexcept {
+  static constexpr auto offset(const data_handle_type &data_handle,
+                               std::size_t index) noexcept ->
+      typename offset_policy::data_handle_type {
     return data_handle_type{data_handle, data_handle.get() + index};
   }
 };
