@@ -7,6 +7,7 @@
 
 namespace tt {
 inline namespace core {
+namespace detail {
 namespace {
 
 constexpr auto find_next_multiple(std::size_t alignment,
@@ -19,6 +20,7 @@ constexpr auto find_next_multiple(std::size_t alignment,
 }
 
 } // namespace
+} // namespace detail
 
 inline constexpr std::size_t default_tile_extent = 4;
 
@@ -33,17 +35,17 @@ private:
   template <class TExtents>
   using padding = std::extents<
       std::size_t,
-      tt::find_next_multiple(tile_height,
-                             TExtents::static_extent(TExtents::rank() - 2)),
-      tt::find_next_multiple(tile_width,
-                             TExtents::static_extent(TExtents::rank() - 1))>;
+      detail::find_next_multiple(tile_height,
+                                 TExtents::static_extent(TExtents::rank() - 2)),
+      detail::find_next_multiple(
+          tile_width, TExtents::static_extent(TExtents::rank() - 1))>;
 
   static_assert(tile_height != std::dynamic_extent and
                 tile_width != std::dynamic_extent);
   static_assert(tt::has_single_bit(tile_size));
 
 public:
-  template <class TExtents, class = TT_REQUIRES(tt::extents<TExtents>)>
+  template <class TExtents, class = std::enable_if_t<tt::extents<TExtents>>>
   struct mapping {
     static_assert(TExtents::rank() >= 2);
 
@@ -59,9 +61,10 @@ public:
     static constexpr auto
     make_padding(const extents_type &exts) noexcept -> padding_type {
       return padding_type{
-          tt::find_next_multiple(tile_height,
-                                 exts.extent(TExtents::rank() - 2)),
-          tt::find_next_multiple(tile_width, exts.extent(TExtents::rank() - 1)),
+          detail::find_next_multiple(tile_height,
+                                     exts.extent(TExtents::rank() - 2)),
+          detail::find_next_multiple(tile_width,
+                                     exts.extent(TExtents::rank() - 1)),
       };
     }
 
@@ -104,10 +107,10 @@ public:
 
     template <class TMapping>
     constexpr auto operator==(const TMapping &rhs) const noexcept
-        -> TT_REQUIRES(tt::mapping<TMapping, layout_type>
-                               and TMapping::extents_type::rank() ==
-                           extents_type::rank(),
-                       bool) {
+        -> std::enable_if_t<tt::mapping<TMapping, layout_type> and
+                                TMapping::extents_type::rank() ==
+                                    extents_type::rank(),
+                            bool> {
       return this->exts == rhs.extents();
     }
 
@@ -117,7 +120,7 @@ public:
 
     template <class... TIndices>
     constexpr auto operator()(TIndices... indices) const noexcept
-        -> TT_REQUIRES((... and tt::index<TIndices>), index_type) {
+        -> std::enable_if_t<(... and tt::index<TIndices>), index_type> {
       return this->accumulate_offset(0, static_cast<index_type>(indices)...);
     }
 
@@ -180,6 +183,19 @@ enum class layout {
   RowMajor,
   Strided,
   Tiled,
+};
+
+template <class T, tt::layout V>
+struct layout_traits {
+  using type = T;
+  static constexpr auto value = V;
+};
+
+struct layouts : layout_traits<tt::RowMajor, tt::layout::RowMajor>,
+                 layout_traits<tt::Strided, tt::layout::Strided>,
+                 layout_traits<tt::Tiled, tt::layout::Tiled> {
+  template <class T, tt::layout V>
+  using fn = layout_traits<T, V>;
 };
 
 } // namespace core

@@ -7,7 +7,7 @@
 #include <string_view>
 
 template <class TInput>
-struct fmt::formatter<TInput, char, TT_REQUIRES(tt::tensor<TInput>)> {
+struct fmt::formatter<TInput, char, std::enable_if_t<tt::tensor<TInput>>> {
 private:
   using element_type = decltype(+std::declval<tt::element_type_t<TInput>>());
 

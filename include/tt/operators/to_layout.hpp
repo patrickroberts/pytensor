@@ -10,17 +10,14 @@ inline namespace operators {
 template <class TLayout>
 struct to_layout_view {};
 
-template <class TInput, class TLayout>
-constexpr auto operator|(const TInput &input,
-                         const to_layout_view<TLayout> &to_layout)
-    -> TT_REQUIRES(tt::tensor<TInput>,
-                   tt::Tensor<tt::element_type_t<TInput>,
-                              tt::extents_type_t<TInput>, TLayout>) {
-  using output_type = decltype(input | to_layout);
-  using element_type = tt::element_type_t<output_type>;
-  using extents_type = tt::extents_type_t<output_type>;
-  using index_type = tt::index_type_t<output_type>;
+template <class TInput, class TLayout,
+          class = std::enable_if_t<tt::tensor<TInput>>>
+constexpr auto operator|(const TInput &input, const to_layout_view<TLayout> &) {
+  using element_type = tt::element_type_t<TInput>;
+  using extents_type = tt::extents_type_t<TInput>;
   using mapping_type = typename TLayout::template mapping<extents_type>;
+  using output_type = tt::Tensor<element_type, extents_type, TLayout>;
+  using index_type = tt::index_type_t<output_type>;
 
   const mapping_type mapping{input.extents()};
   const auto count = mapping.required_span_size();
@@ -47,27 +44,30 @@ constexpr auto operator|(const TInput &input,
   return output;
 }
 
-template <class TLayout>
-struct to_layout_fn {
-  constexpr auto operator()() const -> tt::to_layout_view<TLayout> {
-    return {};
-  }
+template <tt::layout Layout, class TLayout = tt::type_t<tt::layouts, Layout>>
+constexpr auto to_layout() -> tt::to_layout_view<TLayout> {
+  return {};
+}
 
-  template <class TInput>
-  constexpr auto operator()(const TInput &input) const
-      -> TT_REQUIRES(tt::tensor<TInput>,
-                     tt::Tensor<tt::element_type_t<TInput>,
-                                tt::extents_type_t<TInput>, TLayout>) {
-    return input | to_layout_fn{}();
-  }
-};
+template <tt::layout Layout, class TInput,
+          class = std::enable_if_t<tt::tensor<TInput>>>
+constexpr auto to_layout(const TInput &input) {
+  return input | to_layout<Layout>();
+}
 
-template <class TLayout>
-inline constexpr tt::to_layout_fn<TLayout> to_layout{};
+constexpr auto to_row_major() { return to_layout<tt::layout::RowMajor>(); }
 
-inline constexpr tt::to_layout_fn<tt::Tiled> to_tiled{};
+template <class TInput, class = std::enable_if_t<tt::tensor<TInput>>>
+constexpr auto to_row_major(const TInput &input) {
+  return input | to_row_major();
+}
 
-inline constexpr tt::to_layout_fn<tt::RowMajor> to_row_major{};
+constexpr auto to_tiled() { return to_layout<tt::layout::Tiled>(); }
+
+template <class TInput, class = std::enable_if_t<tt::tensor<TInput>>>
+constexpr auto to_tiled(const TInput &input) {
+  return input | to_tiled();
+}
 
 } // namespace operators
 } // namespace tt

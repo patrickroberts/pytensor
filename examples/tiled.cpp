@@ -8,8 +8,8 @@
 
 int main() {
   // create a 3x5x7 tiled tensor of bfloat16...
-  const auto tiled_3d =
-      tt::arange<tt::BFloat16>(1, 106) | tt::reshape(3, 5, 7) | tt::to_tiled();
+  const auto tiled_3d = tt::arange<tt::dtype::BFloat16>(1, 106) |
+                        tt::reshape(3, 5, 7) | tt::to_tiled();
   // ...where tile size is 4x4
   static_assert(tt::default_tile_extent == 4);
 

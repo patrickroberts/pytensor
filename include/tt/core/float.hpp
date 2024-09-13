@@ -18,6 +18,7 @@ static_assert(std::numeric_limits<tt::Float32>::is_iec559 and
 static_assert(std::numeric_limits<tt::Float64>::is_iec559 and
               sizeof(tt::Float64) == 8);
 
+namespace detail {
 namespace {
 
 inline constexpr std::uint16_t BFloat16_quiet_NaN = 0x7FC0;
@@ -40,6 +41,7 @@ round_to_nearest_even(tt::Float32 value) noexcept -> std::uint16_t {
 }
 
 } // namespace
+} // namespace detail
 
 struct BFloat16 final {
 private:
@@ -47,13 +49,12 @@ private:
 
 public:
   // GCC bug disallows constexpr keyword on explicitly defaulted function
-  inline TT_EXPLICIT(false) BFloat16() noexcept = default;
+  inline BFloat16() noexcept = default;
 
-  constexpr TT_EXPLICIT(false) BFloat16(tt::Float32 other) noexcept
-      : value(tt::round_to_nearest_even(other)) {}
+  constexpr BFloat16(tt::Float32 other) noexcept
+      : value(detail::round_to_nearest_even(other)) {}
 
-  [[nodiscard]] constexpr TT_EXPLICIT(false)
-  operator tt::Float32() const noexcept {
+  [[nodiscard]] constexpr operator tt::Float32() const noexcept {
     return tt::bit_cast<tt::Float32>(static_cast<std::uint32_t>(value) << 16);
   }
 
@@ -193,7 +194,7 @@ struct std::numeric_limits<tt::BFloat16> {
 
   static constexpr auto quiet_NaN() noexcept -> tt::BFloat16 {
     constexpr auto quiet_NaN_value =
-        tt::bit_cast<tt::BFloat16>(tt::BFloat16_quiet_NaN);
+        tt::bit_cast<tt::BFloat16>(tt::detail::BFloat16_quiet_NaN);
     return quiet_NaN_value;
   }
 

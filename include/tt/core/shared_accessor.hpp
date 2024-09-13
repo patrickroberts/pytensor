@@ -16,9 +16,8 @@ struct shared_accessor {
 
   constexpr shared_accessor() noexcept = default;
 
-  template <class TOtherElement,
-            class = TT_REQUIRES(
-                std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
+  template <class TOtherElement, class = std::enable_if_t<std::is_convertible_v<
+                                     TOtherElement (*)[], element_type (*)[]>>>
   constexpr shared_accessor(
       const shared_accessor<TOtherElement, TOffsetPolicy> &) noexcept {}
 

@@ -17,15 +17,13 @@ struct weak_accessor {
 
   constexpr weak_accessor() noexcept = default;
 
-  template <class TOtherElement,
-            class = TT_REQUIRES(
-                std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
+  template <class TOtherElement, class = std::enable_if_t<std::is_convertible_v<
+                                     TOtherElement (*)[], element_type (*)[]>>>
   constexpr weak_accessor(
       const shared_accessor<TOtherElement, weak_offset_policy> &) noexcept {}
 
-  template <class TOtherElement,
-            class = TT_REQUIRES(
-                std::is_convertible_v<TOtherElement (*)[], element_type (*)[]>)>
+  template <class TOtherElement, class = std::enable_if_t<std::is_convertible_v<
+                                     TOtherElement (*)[], element_type (*)[]>>>
   constexpr weak_accessor(const weak_accessor<TOtherElement> &) noexcept {}
 
   static constexpr auto access(const data_handle_type &data_handle,

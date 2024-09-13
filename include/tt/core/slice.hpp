@@ -17,27 +17,26 @@ private:
 
 public:
   template <class TOffset, class TExtent, class TStride>
-  constexpr auto operator()(TOffset offset, TExtent extent,
-                            TStride stride) const
-      -> TT_REQUIRES(
-          tt::index<TOffset> and tt::index<TExtent> and tt::index<TStride>,
-          std::strided_slice<TOffset, TExtent, TStride>) {
+  constexpr auto operator()(TOffset offset, TExtent extent, TStride stride)
+      const -> std::enable_if_t<tt::index<TOffset> and tt::index<TExtent> and
+                                    tt::index<TStride>,
+                                std::strided_slice<TOffset, TExtent, TStride>> {
     return {offset, extent, stride};
   }
 
   template <class TOffset, class TExtent>
   constexpr auto operator()(TOffset offset, TExtent extent) const
-      -> TT_REQUIRES(
+      -> std::enable_if_t<
           tt::index<TOffset> and tt::index<TExtent>,
-          std::strided_slice<TOffset, TExtent, default_stride_type>) {
+          std::strided_slice<TOffset, TExtent, default_stride_type>> {
     return tt::slice_fn{}(offset, extent, default_stride);
   }
 
   template <class TExtent>
   constexpr auto operator()(TExtent extent) const
-      -> TT_REQUIRES(tt::index<TExtent>,
-                     std::strided_slice<default_offset_type, TExtent,
-                                        default_stride_type>) {
+      -> std::enable_if_t<tt::index<TExtent>,
+                          std::strided_slice<default_offset_type, TExtent,
+                                             default_stride_type>> {
     return tt::slice_fn{}(default_offset, extent);
   }
 };

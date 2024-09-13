@@ -16,7 +16,6 @@ using std::make_shared_for_overwrite;
 #else
 
 #include <tt/core/detail/delete.hpp>
-#include <tt/core/preprocessor.hpp>
 
 #include <memory>
 #include <type_traits>
@@ -26,8 +25,8 @@ inline namespace core {
 
 template <class T>
 constexpr auto make_shared(std::size_t count) noexcept
-    -> TT_REQUIRES(std::is_array_v<T> and std::extent_v<T> == 0,
-                   std::shared_ptr<T>) {
+    -> std::enable_if_t<std::is_array_v<T> and std::extent_v<T> == 0,
+                        std::shared_ptr<T>> {
   auto alloc = std::allocator<std::remove_extent_t<T>>{};
   const auto pointer = alloc.allocate(count);
 
@@ -39,8 +38,8 @@ constexpr auto make_shared(std::size_t count) noexcept
 template <class T>
 constexpr auto make_shared(std::size_t count,
                            const std::remove_extent_t<T> &value) noexcept
-    -> TT_REQUIRES(std::is_array_v<T> and std::extent_v<T> == 0,
-                   std::shared_ptr<T>) {
+    -> std::enable_if_t<std::is_array_v<T> and std::extent_v<T> == 0,
+                        std::shared_ptr<T>> {
   auto alloc = std::allocator<std::remove_extent_t<T>>{};
   const auto pointer = alloc.allocate(count);
 
@@ -51,8 +50,8 @@ constexpr auto make_shared(std::size_t count,
 
 template <class T>
 constexpr auto make_shared_for_overwrite(std::size_t count) noexcept
-    -> TT_REQUIRES(std::is_array_v<T> and std::extent_v<T> == 0,
-                   std::shared_ptr<T>) {
+    -> std::enable_if_t<std::is_array_v<T> and std::extent_v<T> == 0,
+                        std::shared_ptr<T>> {
   auto alloc = std::allocator<std::remove_extent_t<T>>{};
   const auto pointer = alloc.allocate(count);
 

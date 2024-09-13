@@ -1,24 +1,24 @@
 #pragma once
 
+#include <tt/core/dtype.hpp>
 #include <tt/core/memory.hpp>
 #include <tt/core/tensor.hpp>
 
 namespace tt {
 inline namespace operators {
 
-struct full_fn {
-  template <class T, class... TIndices>
-  constexpr auto operator()(T fill_value, TIndices... extents) const
-      -> TT_REQUIRES(tt::arithmetic<T>,
-                     tt::RowMajorTensor<T, tt::extents_from<TIndices...>>) {
-    const std::size_t size = (1 * ... * extents);
+template <auto... Vs, class T, class... TIndices>
+constexpr auto full(T fill_value, TIndices... extents) {
+  constexpr auto default_dtype = tt::value_v<tt::dtypes, T>;
+  using element_type = tt::type_t<tt::dtypes, default_dtype, Vs...>;
+  using extents_type = tt::extents_from<TIndices...>;
+  using layout_type = tt::type_t<tt::layouts, tt::layout::RowMajor, Vs...>;
 
-    using explicit_t = decltype(operator()(fill_value, extents...));
-    return explicit_t{tt::make_shared<T[]>(size, fill_value), extents...};
-  }
-};
+  const std::size_t size = (1 * ... * extents);
 
-inline constexpr tt::full_fn full{};
+  return tt::Tensor<element_type, extents_type, layout_type>{
+      tt::make_shared<element_type[]>(size, fill_value), extents...};
+}
 
 } // namespace operators
 } // namespace tt

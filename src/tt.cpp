@@ -6,6 +6,7 @@
 #include <tt/core/tensor.hpp>
 #include <tt/operators/arange.hpp>
 #include <tt/operators/empty.hpp>
+#include <tt/operators/eye.hpp>
 #include <tt/operators/full.hpp>
 
 #include <boost/mp11.hpp>
@@ -17,34 +18,36 @@
 #include <nanobind/stl/variant.h>
 
 #include <memory>
+#include <stdexcept>
 
-TT_CONSTEVAL auto name_of(tt::Float32) { return "Float32"; }
-TT_CONSTEVAL auto name_of(tt::Float64) { return "Float64"; }
-TT_CONSTEVAL auto name_of(tt::BFloat16) { return "BFloat16"; }
-TT_CONSTEVAL auto name_of(tt::UInt8) { return "UInt8"; }
-TT_CONSTEVAL auto name_of(tt::Int8) { return "Int8"; }
-TT_CONSTEVAL auto name_of(tt::Int16) { return "Int16"; }
-TT_CONSTEVAL auto name_of(tt::Int32) { return "Int32"; }
-TT_CONSTEVAL auto name_of(tt::Int64) { return "Int64"; }
-TT_CONSTEVAL auto name_of(tt::Bool) { return "Bool"; }
+constexpr auto name_of(tt::Float32) { return "Float32"; }
+constexpr auto name_of(tt::Float64) { return "Float64"; }
+constexpr auto name_of(tt::BFloat16) { return "BFloat16"; }
+constexpr auto name_of(tt::UInt8) { return "UInt8"; }
+constexpr auto name_of(tt::Int8) { return "Int8"; }
+constexpr auto name_of(tt::Int16) { return "Int16"; }
+constexpr auto name_of(tt::Int32) { return "Int32"; }
+constexpr auto name_of(tt::Int64) { return "Int64"; }
+constexpr auto name_of(tt::Bool) { return "Bool"; }
 
-TT_CONSTEVAL auto name_of(tt::dims<0>) { return "Scalar"; }
-TT_CONSTEVAL auto name_of(tt::dims<1>) { return "Vector"; }
-TT_CONSTEVAL auto name_of(tt::dims<2>) { return "Matrix"; }
-TT_CONSTEVAL auto name_of(tt::dims<3>) { return "Tensor3D"; }
-TT_CONSTEVAL auto name_of(tt::dims<4>) { return "Tensor4D"; }
-TT_CONSTEVAL auto name_of(tt::dims<5>) { return "Tensor5D"; }
-TT_CONSTEVAL auto name_of(tt::dims<6>) { return "Tensor6D"; }
-TT_CONSTEVAL auto name_of(tt::dims<7>) { return "Tensor7D"; }
-TT_CONSTEVAL auto name_of(tt::dims<8>) { return "Tensor8D"; }
+constexpr auto name_of(tt::dims<0>) { return "Scalar"; }
+constexpr auto name_of(tt::dims<1>) { return "Vector"; }
+constexpr auto name_of(tt::dims<2>) { return "Matrix"; }
+constexpr auto name_of(tt::dims<3>) { return "Tensor3D"; }
+constexpr auto name_of(tt::dims<4>) { return "Tensor4D"; }
+constexpr auto name_of(tt::dims<5>) { return "Tensor5D"; }
+constexpr auto name_of(tt::dims<6>) { return "Tensor6D"; }
+constexpr auto name_of(tt::dims<7>) { return "Tensor7D"; }
+constexpr auto name_of(tt::dims<8>) { return "Tensor8D"; }
 
-TT_CONSTEVAL auto name_of(tt::RowMajor) { return "RowMajor"; }
-TT_CONSTEVAL auto name_of(tt::Tiled) { return "Tiled"; }
+constexpr auto name_of(tt::RowMajor) { return "RowMajor"; }
+constexpr auto name_of(tt::Strided) { return "Strided"; }
+constexpr auto name_of(tt::Tiled) { return "Tiled"; }
 
 namespace py = nanobind;
 namespace mp = boost::mp11;
 
-template <class TEnum, class = TT_REQUIRES(std::is_enum_v<TEnum>)>
+template <class TEnum, class = std::enable_if_t<std::is_enum_v<TEnum>>>
 constexpr auto bind_enum(const py::handle &handle) -> void {
   constexpr auto type_name = magic_enum::enum_type_name<TEnum>();
 
@@ -60,9 +63,9 @@ constexpr auto bind_enum(const py::handle &handle) -> void {
 }
 
 template <class TCallback, std::size_t... Is>
-constexpr auto apply_extents(const py::args &args, TCallback callback,
+constexpr auto apply_extents(const py::args &extents, TCallback callback,
                              std::index_sequence<Is...>) {
-  return callback(py::cast<std::size_t>(args[Is])...);
+  return callback(py::cast<std::size_t>(extents[Is])...);
 }
 
 NB_MODULE(_tt, m) {
@@ -75,16 +78,16 @@ NB_MODULE(_tt, m) {
   using extents_types = mp::mp_list<tt::dims<0>, tt::dims<1>, tt::dims<2>,
                                     tt::dims<3>, tt::dims<4>, tt::dims<5>,
                                     tt::dims<6>, tt::dims<7>, tt::dims<8>>;
-  using row_major_tensor_types =
+  using non_tiled_tensor_types =
       mp::mp_product<tt::Tensor, element_types, extents_types,
-                     mp::mp_list<tt::RowMajor>>;
+                     mp::mp_list<tt::RowMajor, tt::Strided>>;
   using tiled_tensor_types = mp::mp_product<
       tt::Tensor, element_types,
       mp::mp_list<tt::dims<2>, tt::dims<3>, tt::dims<4>, tt::dims<5>,
                   tt::dims<6>, tt::dims<7>, tt::dims<8>>,
       mp::mp_list<tt::Tiled>>;
   using tensor_types =
-      mp::mp_transform<mp::mp_identity, mp::mp_append<row_major_tensor_types,
+      mp::mp_transform<mp::mp_identity, mp::mp_append<non_tiled_tensor_types,
                                                       tiled_tensor_types>>;
 
   auto m_tensor = m.def_submodule("Tensor");
@@ -114,15 +117,14 @@ NB_MODULE(_tt, m) {
 
   m.def("get_default_dtype", [=] { return *default_dtype; });
 
-  constexpr auto invoke_with_element = [](tt::dtype dtype, auto callback) {
-    constexpr mp::mp_size<element_types> element_types_count{};
+  constexpr auto visit_enum = [](auto value, auto callback) {
+    using enum_type = decltype(value);
+    static_assert(std::is_enum_v<enum_type>);
 
-    static_assert(element_types_count == magic_enum::enum_count<tt::dtype>());
-
-    return mp::mp_with_index<element_types_count>(
-        *magic_enum::enum_index(dtype), [&](auto index) {
-          using element_type = mp::mp_at_c<element_types, index>;
-          return callback(element_type{});
+    return mp::mp_with_index<magic_enum::enum_count<enum_type>()>(
+        *magic_enum::enum_index(value), [&](auto index) {
+          constexpr auto value = magic_enum::enum_value<enum_type, index>();
+          return callback(tt::constant<value>{});
         });
   };
 
@@ -140,9 +142,8 @@ NB_MODULE(_tt, m) {
             }
           }();
 
-          return invoke_with_element(arg, [&](auto element) {
-            using element_type = decltype(element);
-            return py::cast(tt::arange<element_type>(args...));
+          return visit_enum(arg, [&](auto dtype) {
+            return py::cast(tt::arange<dtype()>(args...));
           });
         },
         start, end, step);
@@ -164,43 +165,54 @@ NB_MODULE(_tt, m) {
         py::arg("step") = default_step, py::kw_only(),
         py::arg("dtype") = py::none());
 
-  constexpr auto invoke_with_extents = [](const py::args &args, auto callback) {
-    constexpr mp::mp_size<extents_types> extents_types_count{};
+  constexpr auto visit_extents = [](const py::args &extents, auto callback) {
+    using extents_size = mp::mp_size<extents_types>;
 
-    return mp::mp_with_index<extents_types_count>(args.size(), [&](auto rank) {
-      return apply_extents(args, callback, std::make_index_sequence<rank>{});
+    if (extents.size() >= extents_size::value) {
+      throw std::range_error(
+          fmt::format("len(extents) {} not supported; must be less than {}",
+                      extents.size(), extents_size::value));
+    }
+
+    for (std::size_t index = 0; index < extents.size(); ++index) {
+      if (not py::isinstance<std::size_t>(extents[index])) {
+        throw py::type_error(py::str("expected extents[{}] to be {}; got {}")
+                                 .format(index, py::inst_name(py::cast(index)),
+                                         py::repr(extents[index]))
+                                 .c_str());
+      }
+    }
+
+    return mp::mp_with_index<extents_size>(extents.size(), [&](auto rank) {
+      return apply_extents(extents, callback, std::make_index_sequence<rank>{});
     });
   };
 
-  constexpr auto invoke_with_element_and_extents =
-      [=](tt::dtype dtype, const py::args &args, auto callback) {
-        return invoke_with_element(dtype, [&](auto element) {
-          return invoke_with_extents(args, [&](auto... extents) {
-            return callback(element, extents...);
+  constexpr auto visit_dtype_and_extents =
+      [=](tt::dtype dtype, const py::args &extents, auto callback) {
+        return visit_enum(dtype, [&](auto dtype) {
+          return visit_extents(extents, [&](auto... extents) {
+            return callback(dtype, extents...);
           });
         });
       };
 
   const auto bind_with_fill = [=](auto fill_value) {
-    return [=](const py::args &args, std::optional<tt::dtype> dtype) {
-      return invoke_with_element_and_extents(
-          value_or_default(dtype), args, [&](auto element, auto... extents) {
-            using element_type = decltype(element);
-            return py::cast(
-                tt::full(static_cast<element_type>(fill_value), extents...));
+    return [=](const py::args &extents, std::optional<tt::dtype> dtype) {
+      return visit_dtype_and_extents(
+          value_or_default(dtype), extents, [&](auto dtype, auto... extents) {
+            return py::cast(tt::full<dtype()>(fill_value, extents...));
           });
     };
   };
 
   m.def(
-      "fill",
-      [=](tt::Float64 fill_value, const py::args &args,
+      "full",
+      [=](tt::Float64 fill_value, const py::args &extents,
           std::optional<tt::dtype> dtype) {
-        return invoke_with_element_and_extents(
-            value_or_default(dtype), args, [&](auto element, auto... extents) {
-              using element_type = decltype(element);
-              return py::cast(
-                  tt::full(static_cast<element_type>(fill_value), extents...));
+        return visit_dtype_and_extents(
+            value_or_default(dtype), extents, [&](auto dtype, auto... extents) {
+              return py::cast(tt::full<dtype()>(fill_value, extents...));
             });
       },
       py::arg("fill_value"), py::arg("extents"), py::kw_only(),
@@ -214,12 +226,30 @@ NB_MODULE(_tt, m) {
 
   m.def(
       "empty",
-      [=](const py::args &args, std::optional<tt::dtype> dtype) {
-        return invoke_with_element_and_extents(
-            value_or_default(dtype), args, [](auto element, auto... extents) {
-              using element_type = decltype(element);
-              return py::cast(tt::empty<element_type>(extents...));
+      [=](const py::args &extents, std::optional<tt::dtype> dtype) {
+        return visit_dtype_and_extents(
+            value_or_default(dtype), extents, [](auto dtype, auto... extents) {
+              return py::cast(tt::empty<dtype()>(extents...));
             });
       },
       py::arg("extents"), py::kw_only(), py::arg("dtype") = py::none());
+
+  m.def(
+      "eye",
+      [=](std::size_t extent, std::optional<tt::dtype> dtype) {
+        return visit_enum(value_or_default(dtype), [&](auto dtype) {
+          return py::cast(tt::eye<dtype()>(extent));
+        });
+      },
+      py::arg("extent"), py::kw_only(), py::arg("dtype") = py::none());
+
+  m.def(
+      "eye",
+      [=](std::size_t rows, std::size_t cols, std::optional<tt::dtype> dtype) {
+        return visit_enum(value_or_default(dtype), [&](auto dtype) {
+          return py::cast(tt::eye<dtype()>(rows, cols));
+        });
+      },
+      py::arg("rows"), py::arg("cols"), py::kw_only(),
+      py::arg("dtype") = py::none());
 }

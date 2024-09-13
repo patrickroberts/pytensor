@@ -1,38 +1,41 @@
 #pragma once
 
+#include <tt/core/dtype.hpp>
 #include <tt/operators/empty.hpp>
 
 namespace tt {
 inline namespace operators {
 
-template <class T, class = TT_REQUIRES(tt::arithmetic<T>)>
-struct arange_fn {
-  template <class TStep>
-  constexpr auto operator()(T start, T end, TStep step) const
-      -> TT_REQUIRES(tt::arithmetic<TStep>, tt::RowMajorVector<T>) {
-    const std::size_t size = static_cast<T>(end - start - 1) / step + 1;
-    const auto result = tt::empty<T>(size);
+template <auto... Vs, class TStart, class TEnd, class TStep>
+constexpr auto arange(TStart start, TEnd end, TStep step) {
+  using common_type = std::common_type_t<TStart, TEnd, TStep>;
+  using element_type =
+      tt::type_t<tt::dtypes, tt::value_v<tt::dtypes, common_type>, Vs...>;
 
-    for (std::size_t index = 0; index < size; ++index) {
-      result[index] = start + index * step;
-    }
+  constexpr auto dtype = tt::value_v<tt::dtypes, element_type>;
 
-    return result;
+  const std::size_t size =
+      static_cast<element_type>(end - start - 1) / step + 1;
+  const auto result = tt::empty<dtype>(size);
+
+  for (std::size_t index = 0; index < size; ++index) {
+    result[index] = start + index * step;
   }
 
-  constexpr auto operator()(T start, T end) const -> tt::RowMajorVector<T> {
-    constexpr T step{1};
-    return arange_fn{}(start, end, step);
-  }
+  return result;
+}
 
-  constexpr auto operator()(T end) const -> tt::RowMajorVector<T> {
-    constexpr T start{0};
-    return arange_fn{}(start, end);
-  }
-};
+template <auto... Vs, class TStart, class TEnd>
+constexpr auto arange(TStart start, TEnd end) {
+  constexpr std::common_type_t<TStart, TEnd> step{1};
+  return arange<Vs...>(start, end, step);
+}
 
-template <class T, class = TT_REQUIRES(tt::arithmetic<T>)>
-inline constexpr tt::arange_fn<T> arange{};
+template <auto... Vs, class TEnd>
+constexpr auto arange(TEnd end) {
+  constexpr TEnd start{0};
+  return arange<Vs...>(start, end);
+}
 
 } // namespace operators
 } // namespace tt

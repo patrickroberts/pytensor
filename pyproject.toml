@@ -12,7 +12,9 @@ authors = [
 
 [tool.scikit-build]
 minimum-version = "0.10"
+cmake.build-type = "Debug"
 cmake.define = { TT_EXAMPLES = "OFF" }
+install.strip = false
 
 build-dir = "build/{wheel_tag}"
 
