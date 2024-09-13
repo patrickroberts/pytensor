@@ -15,6 +15,7 @@ private:
   TExtents extents;
 
 public:
+  constexpr reshape_view() noexcept = default;
   constexpr reshape_view(const TExtents &extents) : extents{extents} {}
 
   template <class TInput, class = std::enable_if_t<tt::tensor<TInput>>>
@@ -39,13 +40,6 @@ template <class... TIndices,
 constexpr auto reshape(TIndices... extents)
     -> tt::reshape_view<tt::extents_from<TIndices...>> {
   return extents_from<TIndices...>{extents...};
-}
-
-template <class TInput, class... TIndices,
-          class = std::enable_if_t<(tt::tensor<TInput> and ... and
-                                    tt::index<TIndices>)>>
-constexpr auto reshape(const TInput &input, TIndices... extents) {
-  return input | tt::reshape(extents...);
 }
 
 } // namespace operators

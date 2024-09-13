@@ -10,9 +10,13 @@ inline namespace operators {
 template <class TLayout>
 struct to_layout_view {};
 
+using to_row_major_view = tt::to_layout_view<tt::RowMajor>;
+using to_tiled_view = tt::to_layout_view<tt::Tiled>;
+
 template <class TInput, class TLayout,
           class = std::enable_if_t<tt::tensor<TInput>>>
-constexpr auto operator|(const TInput &input, const to_layout_view<TLayout> &) {
+constexpr auto operator|(const TInput &input,
+                         const tt::to_layout_view<TLayout> &) {
   using element_type = tt::element_type_t<TInput>;
   using extents_type = tt::extents_type_t<TInput>;
   using mapping_type = typename TLayout::template mapping<extents_type>;
@@ -49,25 +53,9 @@ constexpr auto to_layout() -> tt::to_layout_view<TLayout> {
   return {};
 }
 
-template <tt::layout Layout, class TInput,
-          class = std::enable_if_t<tt::tensor<TInput>>>
-constexpr auto to_layout(const TInput &input) {
-  return input | to_layout<Layout>();
-}
+constexpr auto to_row_major() { return tt::to_layout<tt::layout::RowMajor>(); }
 
-constexpr auto to_row_major() { return to_layout<tt::layout::RowMajor>(); }
-
-template <class TInput, class = std::enable_if_t<tt::tensor<TInput>>>
-constexpr auto to_row_major(const TInput &input) {
-  return input | to_row_major();
-}
-
-constexpr auto to_tiled() { return to_layout<tt::layout::Tiled>(); }
-
-template <class TInput, class = std::enable_if_t<tt::tensor<TInput>>>
-constexpr auto to_tiled(const TInput &input) {
-  return input | to_tiled();
-}
+constexpr auto to_tiled() { return tt::to_layout<tt::layout::Tiled>(); }
 
 } // namespace operators
 } // namespace tt

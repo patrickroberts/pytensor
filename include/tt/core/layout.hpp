@@ -35,10 +35,14 @@ private:
   template <class TExtents>
   using padding = std::extents<
       std::size_t,
-      detail::find_next_multiple(tile_height,
-                                 TExtents::static_extent(TExtents::rank() - 2)),
       detail::find_next_multiple(
-          tile_width, TExtents::static_extent(TExtents::rank() - 1))>;
+          tile_height, TExtents::rank() >= 2
+                           ? TExtents::static_extent(TExtents::rank() - 2)
+                           : tile_height),
+      detail::find_next_multiple(
+          tile_width, TExtents::rank() >= 1
+                          ? TExtents::static_extent(TExtents::rank() - 1)
+                          : tile_width)>;
 
   static_assert(tile_height != std::dynamic_extent and
                 tile_width != std::dynamic_extent);
@@ -47,8 +51,6 @@ private:
 public:
   template <class TExtents, class = std::enable_if_t<tt::extents<TExtents>>>
   struct mapping {
-    static_assert(TExtents::rank() >= 2);
-
     using extents_type = TExtents;
     using index_type = tt::index_type_t<extents_type>;
     using size_type = tt::size_type_t<extents_type>;
@@ -62,9 +64,13 @@ public:
     make_padding(const extents_type &exts) noexcept -> padding_type {
       return padding_type{
           detail::find_next_multiple(tile_height,
-                                     exts.extent(TExtents::rank() - 2)),
+                                     TExtents::rank() >= 2
+                                         ? exts.extent(TExtents::rank() - 2)
+                                         : tile_height),
           detail::find_next_multiple(tile_width,
-                                     exts.extent(TExtents::rank() - 1)),
+                                     TExtents::rank() >= 1
+                                         ? exts.extent(TExtents::rank() - 1)
+                                         : tile_width),
       };
     }
 
@@ -78,6 +84,17 @@ public:
                  (value + (row / tile_height) * tile_height) +
              (row % tile_height) * tile_width + (col / tile_width) * tile_size +
              (col % tile_width);
+    }
+
+    constexpr auto
+    accumulate_offset(index_type value) const noexcept -> index_type {
+      return accumulate_offset(value, 0, 0);
+    }
+
+    constexpr auto
+    accumulate_offset(index_type value,
+                      index_type col) const noexcept -> index_type {
+      return accumulate_offset(value, 0, col);
     }
 
     template <class... TIndices>
@@ -125,11 +142,16 @@ public:
     }
 
     constexpr auto required_span_size() const noexcept -> index_type {
-      return this->exts.extent(0) * this->stride(0);
+      if constexpr (extents_type::rank() < 2) {
+        return this->pads.extent(0) * this->pads.extent(1);
+      } else {
+        return this->exts.extent(0) * this->stride(0);
+      }
     }
 
     constexpr auto stride(rank_type r) const noexcept -> index_type {
-      constexpr rank_type unpadded_ranks = extents_type::rank() - 2;
+      constexpr rank_type unpadded_ranks =
+          extents_type::rank() >= 2 ? extents_type::rank() - 2 : 0;
 
       assert(r < unpadded_ranks);
 
@@ -149,10 +171,12 @@ public:
     static constexpr auto is_always_exhaustive() noexcept -> bool {
       constexpr rank_type rank = extents_type::rank();
 
-      if constexpr (extents_type::static_extent(rank - 2) ==
-                        std::dynamic_extent or
-                    extents_type::static_extent(rank - 1) ==
-                        std::dynamic_extent) {
+      if constexpr (rank < 2) {
+        return false;
+      } else if constexpr (extents_type::static_extent(rank - 2) ==
+                               std::dynamic_extent or
+                           extents_type::static_extent(rank - 1) ==
+                               std::dynamic_extent) {
         return false;
       } else {
         return extents_type::static_extent(rank - 2) ==
@@ -167,8 +191,12 @@ public:
     constexpr auto is_exhaustive() const noexcept -> bool {
       constexpr rank_type rank = extents_type::rank();
 
-      return this->exts.extent(rank - 2) == this->pads.extent(0) and
-             this->exts.extent(rank - 1) == this->pads.extent(1);
+      if constexpr (rank < 2) {
+        return false;
+      } else {
+        return this->exts.extent(rank - 2) == this->pads.extent(0) and
+               this->exts.extent(rank - 1) == this->pads.extent(1);
+      }
     }
 
     static constexpr auto is_strided() noexcept -> bool { return false; }

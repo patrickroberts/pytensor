@@ -8,11 +8,14 @@
 #include <tt/operators/empty.hpp>
 #include <tt/operators/eye.hpp>
 #include <tt/operators/full.hpp>
+#include <tt/operators/reshape.hpp>
+#include <tt/operators/to_layout.hpp>
 
 #include <boost/mp11.hpp>
 #include <fmt/format.h>
 #include <magic_enum.hpp>
 #include <nanobind/nanobind.h>
+#include <nanobind/operators.h>
 #include <nanobind/stl/optional.h>
 #include <nanobind/stl/string.h>
 #include <nanobind/stl/variant.h>
@@ -33,16 +36,28 @@ constexpr auto name_of(tt::Bool) { return "Bool"; }
 constexpr auto name_of(tt::dims<0>) { return "Scalar"; }
 constexpr auto name_of(tt::dims<1>) { return "Vector"; }
 constexpr auto name_of(tt::dims<2>) { return "Matrix"; }
-constexpr auto name_of(tt::dims<3>) { return "Tensor3D"; }
-constexpr auto name_of(tt::dims<4>) { return "Tensor4D"; }
-constexpr auto name_of(tt::dims<5>) { return "Tensor5D"; }
-constexpr auto name_of(tt::dims<6>) { return "Tensor6D"; }
-constexpr auto name_of(tt::dims<7>) { return "Tensor7D"; }
-constexpr auto name_of(tt::dims<8>) { return "Tensor8D"; }
+
+template <std::size_t... Extents,
+          class = std::enable_if_t<(... and (Extents == std::dynamic_extent))>>
+auto name_of(std::extents<std::size_t, Extents...>) {
+  static const auto name = fmt::format("Tensor{}D", sizeof...(Extents));
+  return name.c_str();
+}
 
 constexpr auto name_of(tt::RowMajor) { return "RowMajor"; }
-constexpr auto name_of(tt::Strided) { return "Strided"; }
 constexpr auto name_of(tt::Tiled) { return "Tiled"; }
+
+template <class TLayout>
+auto name_of(tt::to_layout_view<TLayout>) {
+  static const auto name = fmt::format("To{}View", name_of(TLayout{}));
+  return name.c_str();
+}
+
+template <class TExtents>
+auto name_of(tt::reshape_view<TExtents>) {
+  static const auto name = fmt::format("To{}View", name_of(TExtents{}));
+  return name.c_str();
+}
 
 namespace py = nanobind;
 namespace mp = boost::mp11;
@@ -78,21 +93,37 @@ NB_MODULE(_tt, m) {
   using extents_types = mp::mp_list<tt::dims<0>, tt::dims<1>, tt::dims<2>,
                                     tt::dims<3>, tt::dims<4>, tt::dims<5>,
                                     tt::dims<6>, tt::dims<7>, tt::dims<8>>;
-  using non_tiled_tensor_types =
-      mp::mp_product<tt::Tensor, element_types, extents_types,
-                     mp::mp_list<tt::RowMajor, tt::Strided>>;
-  using tiled_tensor_types = mp::mp_product<
-      tt::Tensor, element_types,
-      mp::mp_list<tt::dims<2>, tt::dims<3>, tt::dims<4>, tt::dims<5>,
-                  tt::dims<6>, tt::dims<7>, tt::dims<8>>,
-      mp::mp_list<tt::Tiled>>;
+  using layout_types = mp::mp_list<tt::RowMajor, tt::Tiled>;
   using tensor_types =
-      mp::mp_transform<mp::mp_identity, mp::mp_append<non_tiled_tensor_types,
-                                                      tiled_tensor_types>>;
+      mp::mp_product<tt::Tensor, element_types, extents_types, layout_types>;
+  using tensor_identity_types = mp::mp_transform<mp::mp_identity, tensor_types>;
+  using to_layout_view_types =
+      mp::mp_list<tt::to_row_major_view, tt::to_tiled_view>;
+  using reshape_view_types = mp::mp_transform<tt::reshape_view, extents_types>;
+
+  auto m_views = m.def_submodule("views");
+
+  mp::mp_for_each<to_layout_view_types>([&](auto to_layout_view) {
+    using to_layout_view_type = decltype(to_layout_view);
+
+    py::class_<to_layout_view_type> c_to_layout_view{
+        m_views,
+        name_of(to_layout_view),
+    };
+  });
+
+  mp::mp_for_each<reshape_view_types>([&](auto reshape_view) {
+    using reshape_view_type = decltype(reshape_view);
+
+    py::class_<reshape_view_type> c_reshape_view{
+        m_views,
+        name_of(reshape_view),
+    };
+  });
 
   auto m_tensor = m.def_submodule("Tensor");
 
-  mp::mp_for_each<tensor_types>([&](auto identity) {
+  mp::mp_for_each<tensor_identity_types>([&](auto identity) {
     using tensor_type = typename decltype(identity)::type;
     using layout_type = tt::layout_type_t<tensor_type>;
     using element_type = tt::element_type_t<tensor_type>;
@@ -105,6 +136,12 @@ NB_MODULE(_tt, m) {
     c_tensor.def("__repr__", [](const tensor_type &tensor) {
       return fmt::format("{}", tensor);
     });
+
+    mp::mp_for_each<to_layout_view_types>(
+        [&](auto to_layout_view) { c_tensor.def(py::self | to_layout_view); });
+
+    mp::mp_for_each<reshape_view_types>(
+        [&](auto reshape_view) { c_tensor.def(py::self | reshape_view); });
   });
 
   const auto default_dtype = std::make_shared<tt::dtype>(tt::dtype::Float32);
@@ -112,6 +149,8 @@ NB_MODULE(_tt, m) {
   const auto value_or_default = [=](std::optional<tt::dtype> dtype) {
     return dtype ? *dtype : *default_dtype;
   };
+
+  m.def("default_tile_extent", [] { return tt::default_tile_extent; });
 
   m.def("set_default_dtype", [=](tt::dtype dtype) { *default_dtype = dtype; });
 
@@ -127,6 +166,19 @@ NB_MODULE(_tt, m) {
           return callback(tt::constant<value>{});
         });
   };
+
+  m.def(
+      "to_layout",
+      [=](tt::layout layout) {
+        return visit_enum(layout, [](auto layout) {
+          return py::cast(tt::to_layout<layout()>());
+        });
+      },
+      py::arg("layout"));
+
+  m.def("to_row_major", tt::to_row_major);
+
+  m.def("to_tiled", tt::to_tiled);
 
   using Number = std::variant<tt::Int64, tt::Float64>;
 
@@ -187,6 +239,15 @@ NB_MODULE(_tt, m) {
       return apply_extents(extents, callback, std::make_index_sequence<rank>{});
     });
   };
+
+  m.def(
+      "reshape",
+      [=](const py::args &extents) {
+        return visit_extents(extents, [](auto... extents) {
+          return py::cast(tt::reshape(extents...));
+        });
+      },
+      py::arg("extents"));
 
   constexpr auto visit_dtype_and_extents =
       [=](tt::dtype dtype, const py::args &extents, auto callback) {
